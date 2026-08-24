@@ -1,0 +1,84 @@
+:root {
+  --bg: #070708;
+  --panel: #111113;
+  --panel2: #171719;
+  --line: #292326;
+  --lime: #ff334f;
+  --purple: #d26bff;
+  --cyan: #ff6478;
+  --orange: #ff8b58;
+}
+
+body {
+  background:
+    radial-gradient(circle at 50% 18%, rgba(116, 13, 31, 0.28) 0, transparent 32%),
+    #070708;
+}
+
+.topbar {
+  background: rgba(7, 7, 8, 0.92);
+}
+
+.mini-avatar {
+  background: #1a0d10;
+  border-color: #5b202a;
+}
+
+.status-dot {
+  box-shadow: 0 0 10px #ff334f;
+}
+
+.level-ring {
+  box-shadow: 0 0 32px rgba(255, 51, 79, 0.12);
+}
+
+.activity-icon {
+  background: #2b1016;
+}
+
+.character-stage {
+  border-color: #43232a;
+  background:
+    radial-gradient(ellipse at 50% 70%, rgba(132, 20, 39, 0.48) 0, transparent 24%),
+    linear-gradient(#160d0f, #09090a);
+}
+
+.stage-glow {
+  background: rgba(255, 35, 69, 0.18);
+}
+
+.stage-grid {
+  background-image:
+    linear-gradient(rgba(255, 51, 79, 0.15) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 51, 79, 0.15) 1px, transparent 1px);
+}
+
+.skin-controls button {
+  border-color: #4c252d;
+  background: rgba(28, 12, 16, 0.86);
+}
+
+.skin-controls .active,
+.completion {
+  border-color: #813040;
+}
+
+.planner {
+  border-top-color: #ff334f;
+}
+
+.goal input:checked {
+  box-shadow: inset 0 0 0 3px #25080e;
+}
+
+.item:hover {
+  border-color: #b62b42;
+}
+
+.collection-bar span {
+  background: linear-gradient(90deg, #8f172b, #ff334f);
+}
+
+.toast {
+  border-color: #5d2933;
+}

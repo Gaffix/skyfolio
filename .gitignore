@@ -1,0 +1,4 @@
+.env
+node_modules/
+data/goals.json
+data/notebook.json

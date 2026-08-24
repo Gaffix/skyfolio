@@ -1,0 +1,185 @@
+const $ = (s) => document.querySelector(s);
+const sampleGoals = [
+  { id: 1, text: 'Reach Catacombs level 45', done: false },
+  { id: 2, text: 'Drop a second Necron’s Handle', done: false },
+  { id: 3, text: 'Max the Garden milestones', done: true }
+];
+const browserGoals=JSON.parse(localStorage.getItem('skyfolio-goals')||'[]');
+const isSampleGoals=list=>JSON.stringify((list||[]).map(x=>x.text))===JSON.stringify(sampleGoals.map(x=>x.text));
+let goals=isSampleGoals(browserGoals)?[]:browserGoals;
+let goalsReady=false;
+let goalsSyncedOnce=false;
+let viewer;
+let currentPlayer = '';
+let currentLoadouts={armorSets:[],equipmentSets:[],loadouts:[]};
+let currentStorage={inventory:[],enderChest:[],personalVault:[],backpacks:[],bags:[]};
+let currentProfile=null;
+const tabPaths={armorSets:'/wardrobe',equipmentSets:'/equipment',loadouts:'/loadouts',inventory:'/inventory',enderChest:'/ender-chest',backpacks:'/backpacks',bags:'/bags'};
+const pathTabs=Object.fromEntries(Object.entries(tabPaths).map(([tab,path])=>[path,tab]));
+const modulePaths={slayer:'/slayer',dungeons:'/dungeons',pets:'/pets',mining:'/mining',garden:'/garden',bestiary:'/bestiary',accessories:'/accessories',mayor:'/mayor',networth:'/networth',notebook:'/notebook'};
+const pathModules=Object.fromEntries(Object.entries(modulePaths).map(([key,path])=>[path,key]));
+let notebookNotes=[],activeNoteId=null,notebookTimer;
+let profileMeta=null,freshnessTimer;
+function setRoute(tab,replace=false){const path=tabPaths[tab]||'/';const url=`${path}${location.search}`;history[replace?'replaceState':'pushState']({tab},'',url)}
+
+function renderAvatar(name) {
+  const canvas=$('#avatarCanvas'), ctx=canvas.getContext('2d'), skin=new Image();
+  ctx.imageSmoothingEnabled=false;
+  skin.onload=()=>{ctx.clearRect(0,0,72,72);ctx.drawImage(skin,8,8,8,8,0,0,72,72);ctx.drawImage(skin,40,8,8,8,0,0,72,72);if(name.toLowerCase()==='gffx')$('#favicon').href=canvas.toDataURL('image/png')};
+  skin.onerror=()=>ctx.clearRect(0,0,72,72);
+  skin.src=`/api/skin/${encodeURIComponent(name)}`;
+}
+
+function initViewer(name = 'Technoblade') {
+  if (!window.skinview3d) return;
+  if (viewer) viewer.dispose();
+  const canvas = $('#skinCanvas');
+  viewer = new skinview3d.SkinViewer({ canvas, width: canvas.clientWidth, height: canvas.clientHeight, skin: `/api/skin/${encodeURIComponent(name)}` });
+  viewer.animation = new skinview3d.IdleAnimation();
+  viewer.animation.speed = 0.7;
+  viewer.autoRotate = true;
+  viewer.autoRotateSpeed = 0.55;
+  viewer.zoom = 0.82;
+  viewer.fov = 52;
+  viewer.controls.enablePan = false;
+}
+
+function renderGoals() {
+  $('#goals').innerHTML = goals.length ? goals.map(g => {const track=trackGoal(g.text);return `<div class="goal ${g.done ? 'done' : ''}" data-id="${g.id}"><input type="checkbox" ${g.done ? 'checked' : ''}><div><label>${escapeHtml(g.text)}</label>${track?`<div style="height:3px;background:#2b2426;margin-top:7px"><span style="display:block;height:100%;width:${track.percent}%;background:var(--lime)"></span></div><small style="display:block;margin-top:4px">${number.format(track.current)} / ${number.format(track.target)} · ${track.percent}%</small>`:''}</div><button aria-label="Delete">×</button></div>`}).join('') : '<div class="goal"><label>Your quest board is empty.</label></div>';
+  const done = goals.filter(g => g.done).length;
+  $('#completion').textContent = goals.length ? `${Math.round(done / goals.length * 100)}%` : '0%';
+  localStorage.setItem('skyfolio-goals', JSON.stringify(goals));
+  if(goalsReady&&currentPlayer)fetch(`/api/goals/${encodeURIComponent(currentPlayer)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({goals})}).catch(()=>{});
+}
+async function syncGoals(player){goalsReady=false;try{const response=await fetch(`/api/goals/${encodeURIComponent(player)}`),data=await response.json(),stored=Array.isArray(data.goals)?data.goals:[];if(stored.length)goals=stored;else if(!goalsSyncedOnce&&goals.length&&!isSampleGoals(goals))await fetch(`/api/goals/${encodeURIComponent(player)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({goals})});else goals=[]}catch{}goalsSyncedOnce=true;goalsReady=true;renderGoals()}
+function trackGoal(text){if(!currentProfile)return null;const lower=text.toLowerCase(),match=lower.match(/(?:level|xp|max|maxed)\s*([\d,.]+)\s*([km])?/);if(!match)return null;let target=Number(match[1].replaceAll(',',''));if(match[2]==='k')target*=1e3;if(match[2]==='m')target*=1e6;let current=null;if(lower.includes('catacomb'))current=currentProfile.catacombs;else if(lower.includes('skyblock level'))current=currentProfile.skyblockLevel;else if(lower.includes('slayer'))current=currentProfile.slayerXp;else if(lower.includes('collection'))current=currentProfile.collections.maxed;else for(const [skill,value] of Object.entries(currentProfile.skills||{}))if(lower.includes(skill)){current=value;break}return current===null?null:{current,target,percent:Math.min(100,Math.round(current/target*100))}}
+function escapeHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+
+$('#goalForm').addEventListener('submit', e => { e.preventDefault(); const input=$('#goalInput'); const text=input.value.trim(); if(!text)return; goals.unshift({id:Date.now(),text,done:false}); input.value=''; renderGoals(); });
+$('#goals').addEventListener('change', e => { const row=e.target.closest('.goal'); if(!row)return; const goal=goals.find(g=>g.id===Number(row.dataset.id)); if(goal)goal.done=e.target.checked; renderGoals(); });
+$('#goals').addEventListener('click', e => { if(e.target.tagName!=='BUTTON')return; const row=e.target.closest('.goal'); goals=goals.filter(g=>g.id!==Number(row.dataset.id)); renderGoals(); });
+$('#clearComplete').addEventListener('click', () => { goals=goals.filter(g=>!g.done); renderGoals(); });
+
+function renderEquipment(items=[]) {
+  const slots={Armor:['Helmet','Chestplate','Leggings','Boots'],Equipment:['Necklace','Cloak','Belt','Gloves']};
+  const grouped={Armor:items.filter(x=>x.group==='Armor').reverse(),Equipment:items.filter(x=>x.group==='Equipment')};
+  const row=(item,label)=>`<div style="height:58px;display:grid;grid-template-columns:46px 1fr;gap:10px;align-items:center;background:#0b0e10;border:1px solid #293036;padding:6px"><div class="item" style="width:44px;height:44px"><img style="width:78%;height:78%;object-fit:contain;image-rendering:pixelated" src="${item?.icon||''}" alt="" onerror="this.hidden=true">${item?.count>1?`<b style="position:absolute;right:2px;bottom:1px;font-size:8px">${item.count}</b>`:''}</div><div style="min-width:0"><small style="display:block;font-size:8px">${label}</small><strong style="display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;margin-top:3px">${item?escapeHtml(item.name):'Empty slot'}</strong></div></div>`;
+  $('#equipmentGrid').innerHTML=Object.keys(slots).map(group=>`<section><small style="display:block;margin-bottom:8px;color:var(--lime)">${group.toUpperCase()}</small><div style="display:flex;flex-direction:column;gap:7px">${slots[group].map((label,i)=>row(grouped[group][i],label)).join('')}</div></section>`).join('');
+}
+function minecraftFormat(value=''){const colors={0:'#000000',1:'#0000aa',2:'#00aa00',3:'#00aaaa',4:'#aa0000',5:'#aa00aa',6:'#ffaa00',7:'#aaaaaa',8:'#555555',9:'#5555ff',a:'#55ff55',b:'#55ffff',c:'#ff5555',d:'#ff55ff',e:'#ffff55',f:'#ffffff'};let state={color:'#aaaaaa',bold:false,italic:false,under:false,strike:false,magic:false},out='',text='';const flush=()=>{if(!text)return;const style=`color:${state.color};font-weight:${state.bold?'700':'400'};font-style:${state.italic?'italic':'normal'};text-decoration:${state.under?'underline ':''}${state.strike?'line-through':''};${state.magic?'filter:blur(.5px)':''}`;out+=`<span style="${style}">${escapeHtml(text)}</span>`;text=''};for(let i=0;i<value.length;i++){if(value[i]==='§'&&i+1<value.length){flush();const code=value[++i].toLowerCase();if(colors[code])state={color:colors[code],bold:false,italic:false,under:false,strike:false,magic:false};else if(code==='l')state.bold=true;else if(code==='o')state.italic=true;else if(code==='n')state.under=true;else if(code==='m')state.strike=true;else if(code==='k')state.magic=true;else if(code==='r')state={color:'#aaaaaa',bold:false,italic:false,under:false,strike:false,magic:false}}else text+=value[i]}flush();return out}
+function itemTooltip(item){return `<div class="mc-tooltip"><strong>${minecraftFormat(item.rawName||item.name)}</strong>${(item.rawLore||item.lore||[]).map(x=>`<div class="lore-line">${minecraftFormat(x)}</div>`).join('')}</div>`}
+function modalItem(item){return item?`<div class="set-item"><img src="${item.icon}" alt="${escapeHtml(item.name)}" onerror="this.hidden=true"><span>${escapeHtml(item.name)}</span>${itemTooltip(item)}</div>`:'<div class="set-item empty">·</div>'}
+function storageSlot(item){return item?`<div class="inventory-slot"><img src="${item.icon}" alt="${escapeHtml(item.name)}" onerror="this.hidden=true">${item.count>1?`<b class="item-count">${item.count}</b>`:''}<span class="item-name">${escapeHtml(item.name)}</span>${itemTooltip(item)}</div>`:'<div class="inventory-slot empty">·</div>'}
+function storageGroup(name,items=[]){const used=items.filter(Boolean).length;return `<section class="storage-group"><header><span>${escapeHtml(name).toUpperCase()}</span><b>${used} ITEM${used===1?'':'S'}</b></header><div class="inventory-slots">${items.map(storageSlot).join('')}</div></section>`}
+function renderStorage(tab){let groups=[];if(tab==='inventory'){const items=currentStorage.inventory||[];groups=[{name:'Main Inventory',items:[...items.slice(9),...items.slice(0,9)]}]}if(tab==='enderChest')groups=[{name:'Ender Chest',items:currentStorage.enderChest},{name:'Personal Vault',items:currentStorage.personalVault}];if(tab==='backpacks')groups=currentStorage.backpacks;if(tab==='bags')groups=currentStorage.bags;const layout=tab==='backpacks'?'storage-groups backpack-grid':'storage-groups';$('#wardrobeContent').innerHTML=groups.length?`<div class="${layout}">${groups.map(x=>storageGroup(x.name,x.items)).join('')}</div>`:'<div class="empty-equipment">No storage data exposed by this profile.</div>'}
+function renderWardrobe(tab='armorSets'){
+  const content=$('#wardrobeContent');
+  if(['inventory','enderChest','backpacks','bags'].includes(tab)){renderStorage(tab);return}
+  if(tab==='loadouts'){
+    content.innerHTML=currentLoadouts.loadouts.length?`<div class="set-grid">${currentLoadouts.loadouts.map(loadout=>{const armor=currentLoadouts.armorSets.find(x=>x.id===loadout.armorSetId),equipment=currentLoadouts.equipmentSets.find(x=>x.id===loadout.equipmentSetId),items=[...(armor?.items||[]),...(equipment?.items||[])];return `<article class="set-card loadout-card"><div class="loadout-number">${loadout.id}</div><div><strong>${escapeHtml(loadout.name)}</strong><small>Armor ${loadout.armorSetId||'—'} · Equipment ${loadout.equipmentSetId||'—'}</small><div class="set-items" style="margin-top:10px">${items.map(modalItem).join('')}</div></div></article>`}).join('')}</div>`:'<div class="empty-equipment">No saved loadouts exposed by this profile.</div>';
+    return;
+  }
+  const label=tab==='armorSets'?'Wardrobe':'Equipment';
+  const sets=currentLoadouts[tab]||[];
+  content.innerHTML=sets.length?`<div class="set-grid">${sets.map(set=>`<article class="set-card ${set.equipped?'active':''}"><div class="set-head"><span>${label.toUpperCase()} SLOT ${set.id}</span>${set.equipped?'<b>● EQUIPPED</b>':''}</div><div class="set-items">${set.items.map(modalItem).join('')}</div></article>`).join('')}</div>`:'<div class="empty-equipment">No saved sets exposed by this profile.</div>';
+}
+function openWardrobe(tab,updateRoute=true){if(typeof tab==='string'){document.querySelectorAll('#wardrobeTabs button').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab))}const active=$('#wardrobeTabs .active').dataset.tab;renderWardrobe(active);$('#wardrobeModal').classList.add('open');$('#wardrobeModal').setAttribute('aria-hidden','false');document.body.style.overflow='hidden';if(updateRoute)setRoute(active)}
+function closeWardrobe(updateRoute=true){$('#wardrobeModal').classList.remove('open');$('#wardrobeModal').setAttribute('aria-hidden','true');document.body.style.overflow='';if(updateRoute)setRoute(null)}
+function renderSkills(values = {}) {
+  const skills=[['⚔','Combat','combat'],['☘','Farming','farming'],['⛏','Mining','mining'],['✦','Enchanting','enchanting'],['♜','Taming','taming']];
+  $('#skillsList').innerHTML=skills.map(([i,n,key])=>{const level=values[key] ?? 0; return `<div class="skill"><span class="skill-icon">${i}</span><div><b>${n}</b><small>${Math.round(level * 10) / 10}</small></div><strong>${Math.floor(level)}</strong></div>`}).join('');
+}
+
+const number = new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 });
+function compact(value) { return new Intl.NumberFormat('en-US', { notation:'compact', maximumFractionDigits:1 }).format(value || 0); }
+function relativeTime(timestamp){const seconds=Math.max(0,Math.floor((Date.now()-timestamp)/1000));if(seconds<60)return 'now';if(seconds<3600)return `${Math.floor(seconds/60)}m`;if(seconds<86400)return `${Math.floor(seconds/3600)}h`;if(seconds<2592000)return `${Math.floor(seconds/86400)}d`;return new Date(timestamp).toLocaleDateString()}
+function renderActivity(events=[]){const icons={dungeon:'♜',shard:'◆',objective:'✓'};$('#activityList').innerHTML=events.length?events.map(event=>`<div class="activity-item"><span class="activity-icon">${icons[event.type]||'✦'}</span><div><b>${escapeHtml(event.title)}</b><small>${escapeHtml(event.detail)}</small></div><time title="${new Date(event.timestamp).toLocaleString()}">${relativeTime(event.timestamp)}</time></div>`).join(''):'<div class="activity-item"><span class="activity-icon">—</span><div><b>No recent public activity</b><small>This profile may have limited API data</small></div></div>'}
+function statCard(title,big,rows=[],featured=false){return `<article class="module-card ${featured?'featured':''}"><small>${escapeHtml(title).toUpperCase()}</small><strong class="big">${big}</strong>${rows.length?`<dl>${rows.map(([k,v])=>`<div><dt>${escapeHtml(String(k))}</dt><dd>${escapeHtml(String(v))}</dd></div>`).join('')}</dl>`:''}</article>`}
+function renderModule(type){if(!currentProfile)return;const p=currentProfile,n=x=>number.format(x||0),c=x=>compact(x||0);let title='',html='';if(type==='slayer'){title='Slayer';html=`<div class="module-grid">${p.slayers.map(x=>statCard(x.name,`LVL ${x.level}`,[['XP',n(x.xp)],...x.kills.map((v,i)=>[`Tier ${i+1} kills`,n(v)])],x.xp>0)).join('')}</div>`}if(type==='dungeons'){const d=p.dungeonDetails;title='Dungeons';html=`<div class="module-grid">${statCard('Catacombs',n(d.level),[['XP',n(d.experience)],['Secrets',n(d.secrets)],['Selected class',d.selectedClass||'—']],true)}${d.classes.map(x=>statCard(x.name,n(x.level),[['XP',n(x.experience)]])).join('')}</div><h3>Floor records</h3><table class="module-table"><thead><tr><th>Floor</th><th>Completions</th><th>Fastest</th></tr></thead><tbody>${d.floors.map(x=>`<tr><td>Floor ${x.floor}</td><td>${n(x.completions)}</td><td>${x.fastest?(x.fastest/1000).toFixed(1)+'s':'—'}</td></tr>`).join('')}</tbody></table>`}if(type==='pets'){title=`Pets · ${p.pets.length}`;html=`<div class="module-grid">${p.pets.map(x=>statCard(x.name,x.tier,[['XP',n(x.experience)],['Held item',x.heldItem||'None'],['Candy',x.candyUsed],['Status',x.active?'ACTIVE':'Stored']],x.active)).join('')}</div>`}if(type==='mining'){const m=p.mining;title='Mining';html=`<div class="module-grid">${['mithril','gemstone','glacite'].map(k=>statCard(`${k} powder`,c(m[k].available),[['Spent',c(m[k].spent)],['Total',c(m[k].available+m[k].spent)]],k==='mithril')).join('')}</div><h3>Crystals</h3><div class="module-grid">${m.crystals.map(x=>statCard(x.name,x.state,[['Found',x.totalFound]])).join('')}</div>`}if(type==='garden'){const g=p.garden;title='Garden';html=`<div class="module-grid">${statCard('Garden XP',n(g.experience),[['Copper',n(g.copper)],['Plots',g.plots]],true)}${statCard('Visitors',n(g.visitorsCompleted),[['Unique visitors',g.uniqueVisitors]])}${g.composter?statCard('Composter',n(g.composter.compost),[['Organic matter',n(g.composter.organicMatter)],['Fuel',n(g.composter.fuel)] ]):''}</div><h3>Crop collection</h3><table class="module-table"><tbody>${g.crops.map(x=>`<tr><td>${escapeHtml(x.name)}</td><td>Upgrade ${x.upgrade}</td><td>${n(x.amount)}</td></tr>`).join('')}</tbody></table>`}if(type==='bestiary'){const b=p.bestiary;title='Bestiary';html=`<div class="module-grid">${statCard('Total kills',n(b.totalKills),[['Unique variants',b.unique],['Last killed',b.lastKilled]],true)}</div><h3>Top mobs</h3><table class="module-table"><tbody>${b.mobs.map((x,i)=>`<tr><td>#${i+1}</td><td>${escapeHtml(x.name)}</td><td>${n(x.kills)}</td></tr>`).join('')}</tbody></table>`}if(type==='networth'){const w=p.networth;title='Net Worth Estimate';html=`<div class="module-grid">${statCard('Estimated total',c(w.total),[['Exact total',n(w.total)]],true)}${statCard('Purse',c(w.purse))}${statCard('Bank',c(w.bank))}${statCard('Inventory',c(w.inventory))}${statCard('Storage',c(w.storage))}${statCard('Wardrobe',c(w.wardrobe))}</div><p class="module-note">${escapeHtml(w.note)}</p>`}$('#moduleTitle').textContent=title;$('#moduleContent').innerHTML=html}
+async function renderNotebook(){if(!currentPlayer)return;$('#moduleTitle').textContent='Notebook';$('#moduleContent').innerHTML='<p class="module-note">Loading notes…</p>';try{const data=await(await fetch(`/api/notebook/${encodeURIComponent(currentPlayer)}`)).json();notebookNotes=Array.isArray(data.notes)?data.notes:[];if(!notebookNotes.some(x=>x.id===activeNoteId))activeNoteId=notebookNotes[0]?.id||null}catch{notebookNotes=[]}renderNotebookEditor()}
+function renderNotebookEditor(){const active=notebookNotes.find(x=>x.id===activeNoteId);$('#moduleContent').innerHTML=`<div class="notebook"><aside><button id="newNote">+ NEW NOTE</button><div>${notebookNotes.map(x=>`<button class="note-link ${x.id===activeNoteId?'active':''}" data-note-id="${x.id}"><strong>${escapeHtml(x.title||'Untitled')}</strong><small>${new Date(x.updated||Date.now()).toLocaleDateString()}</small></button>`).join('')}</div></aside><section class="note-editor">${active?`<div class="note-tools"><span id="noteStatus">Saved</span><button id="deleteNote">Delete</button></div><input id="noteTitle" maxlength="80" value="${escapeHtml(active.title)}" placeholder="Note title"><textarea id="noteBody" maxlength="20000" placeholder="Write farming angles, speeds, reminders, or anything important…">${escapeHtml(active.body)}</textarea>`:'<div class="notebook-empty"><b>No notes yet</b><span>Create a note for farming angles, speeds, or anything important.</span></div>'}</section></div>`}
+function saveNotebook(){clearTimeout(notebookTimer);const status=$('#noteStatus');if(status)status.textContent='Saving…';notebookTimer=setTimeout(async()=>{await fetch(`/api/notebook/${encodeURIComponent(currentPlayer)}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({notes:notebookNotes})});const next=$('#noteStatus');if(next)next.textContent='Saved'},350)}
+function renderSpecialModule(type){const p=currentProfile,n=x=>number.format(x||0);if(type==='accessories'){const a=p.accessories;$('#moduleTitle').textContent='Accessory Bag';$('#moduleContent').innerHTML=`<div class="module-grid">${statCard('Magical Power',n(a.magicalPower),[['Selected power',a.selectedPower],['Unique accessories',a.unique],['Bag upgrades',a.upgrades]],true)}${statCard('Unlocked Powers',a.unlockedPowers.length,a.unlockedPowers.map(x=>[x,'✓']))}${statCard('Tuning',a.tuning.length,a.tuning.map(x=>[x.name,`+${x.value}`]))}${statCard('Duplicates',a.duplicates.length,a.duplicates.map(x=>[x.name,`×${x.count}`]))}</div><h3>Accessory Bag · ${a.items.length} occupied slots</h3><div class="inventory-slots">${a.items.map(storageSlot).join('')}</div>`}if(type==='mayor'){const e=p.mayor,m=e.mayor||{},candidates=e.current?.candidates||[],total=candidates.reduce((s,x)=>s+Number(x.votes||0),0);$('#moduleTitle').textContent='Mayor & Election';$('#moduleContent').innerHTML=`<div class="module-grid"><article class="module-card featured"><small>CURRENT MAYOR</small><strong class="big">${escapeHtml(m.name||'Unknown')}</strong>${(m.perks||[]).map(x=>`<div style="margin-top:12px"><b>${escapeHtml(x.name)}</b><p class="module-note">${minecraftFormat(x.description)}</p></div>`).join('')}</article>${m.minister?`<article class="module-card"><small>MINISTER</small><strong class="big">${escapeHtml(m.minister.name)}</strong><b>${escapeHtml(m.minister.perk?.name||'')}</b><p class="module-note">${minecraftFormat(m.minister.perk?.description||'')}</p></article>`:''}</div><h3>Election Year ${e.current?.year||'—'}</h3><div class="module-grid">${candidates.sort((a,b)=>b.votes-a.votes).map(x=>statCard(x.name,total?`${Math.round(x.votes/total*100)}%`:[['Votes',n(x.votes)]],[['Votes',n(x.votes)],['Perks',x.perks?.length||0]],false)).join('')}</div><p class="module-note">Election data updated ${e.lastUpdated?new Date(e.lastUpdated).toLocaleString():'—'}.</p>`}}
+function openModule(type,updateRoute=true){closeWardrobe(false);if(type==='notebook')renderNotebook();else if(['accessories','mayor'].includes(type))renderSpecialModule(type);else renderModule(type);$('#moduleModal').classList.add('open');$('#moduleModal').setAttribute('aria-hidden','false');document.body.style.overflow='hidden';document.querySelectorAll('#moduleNav button').forEach(x=>x.classList.toggle('active',x.dataset.module===type));if(updateRoute)history.pushState({module:type},'',`${modulePaths[type]}${location.search}`)}
+function closeModule(updateRoute=true){$('#moduleModal').classList.remove('open');$('#moduleModal').setAttribute('aria-hidden','true');document.body.style.overflow='';document.querySelectorAll('#moduleNav button').forEach(x=>x.classList.remove('active'));if(updateRoute)history.pushState({},'',`/${location.search}`)}
+function applyProfile(data) {
+  const p=data.profile; currentPlayer=p.username;currentProfile=p;
+  profileMeta=data.meta||null;updateFreshness();clearInterval(freshnessTimer);freshnessTimer=setInterval(updateFreshness,1000);
+  syncGoals(p.username);
+  $('#playerName').textContent=p.username;
+  renderAvatar(p.username);
+  $('#profileMeta').innerHTML=`<span class="status-dot"></span> Live API data <i></i> ${escapeHtml(p.cuteName)} profile`;
+  $('#skyblockLevel').textContent=number.format(p.skyblockLevel);
+  $('#levelInteger').textContent=Math.floor(p.skyblockLevel);
+  const progress=Math.max(0,Math.min(99,(p.skyblockLevel%1)*100));
+  $('#levelProgress').style.width=`${progress}%`;
+  $('#levelRing').style.background=`radial-gradient(circle,#151a1b 58%,transparent 60%),conic-gradient(var(--lime) ${progress}%,#293027 0)`;
+  $('#levelXp').textContent=`${Math.round(progress)} / 100 to next level`;
+  $('#skillAverage').textContent=number.format(p.skillAverage);
+  $('#catacombs').textContent=number.format(p.catacombs);
+  $('#slayerXp').textContent=compact(p.slayerXp);
+  $('#profileCount').textContent=p.profileCount;
+  $('#purse').textContent=number.format(p.purse);
+  $('#bank').textContent=number.format(p.bank);
+  renderSkills(p.skills);
+  renderEquipment(p.equipment);
+  currentLoadouts=p.loadouts||{armorSets:[],equipmentSets:[],loadouts:[]};
+  currentStorage=p.storage||{inventory:[],enderChest:[],personalVault:[],backpacks:[],bags:[]};
+  const storedItems=[...currentStorage.inventory,...currentStorage.enderChest,...currentStorage.personalVault,...currentStorage.backpacks.flatMap(x=>x.items),...currentStorage.bags.flatMap(x=>x.items)].filter(Boolean).length;
+  $('#storageSummary').textContent=`${storedItems} occupied slots · ${currentStorage.backpacks.length} backpacks · ${currentStorage.bags.length} bags`;
+  const routedTab=pathTabs[location.pathname];if(routedTab)openWardrobe(routedTab,false);
+  const routedModule=pathModules[location.pathname];if(routedModule)openModule(routedModule,false);
+  const collections=p.collections||{percent:0,maxed:0,total:0,tiersCompleted:0,totalTiers:0};
+  $('#collectionPercent').textContent=`${collections.percent}%`;
+  $('#collectionBar').style.width=`${collections.percent}%`;
+  $('#collectionSummary').textContent=`${collections.maxed} of ${collections.total} collections maxed · ${collections.tiersCompleted} / ${collections.totalTiers} tiers`;
+  renderActivity(p.activity);
+  const select=$('#profileSelect');
+  select.innerHTML=data.profiles.map(x=>`<option value="${x.id}" ${x.id===p.id?'selected':''}>${escapeHtml(x.cuteName)}${x.selected?' · active':''}</option>`).join('');
+  select.disabled=false;
+  initViewer(p.username);
+}
+
+async function loadProfile(name, profileId='', force=false) {
+  const input=$('#playerInput'); input.disabled=true;
+  showToast(`Loading ${name} from Hypixel…`);
+  try {
+    const params=new URLSearchParams();if(profileId)params.set('profile',profileId);if(force)params.set('refresh','1');const query=params.size?`?${params}`:'';
+    const response=await fetch(`/api/profile/${encodeURIComponent(name)}${query}`);
+    const data=await response.json();
+    if(!response.ok) throw new Error(data.error || 'Could not load this profile.');
+    applyProfile(data); showToast(`Loaded ${data.profile.username} · ${data.profile.cuteName}`);
+  } catch(error) { showToast(error.message); }
+  finally { input.disabled=false;$('#refreshBtn').classList.remove('loading'); }
+}
+function updateFreshness(){if(!profileMeta)return;const age=Math.max(0,Date.now()-profileMeta.fetchedAt),left=Math.max(0,profileMeta.expiresAt-Date.now()),el=$('#freshness');el.textContent=`Updated ${relativeTime(profileMeta.fetchedAt)} ago · cache ${Math.ceil(left/1000)}s`;el.classList.toggle('fresh',age<60000)}
+
+$('#searchForm').addEventListener('submit', e => { e.preventDefault(); const name=$('#playerInput').value.trim(); if(name)loadProfile(name); });
+$('#profileSelect').addEventListener('change', e=>{if(currentPlayer)loadProfile(currentPlayer,e.target.value)});
+$('#refreshBtn').addEventListener('click',()=>{if(!currentPlayer)return;$('#refreshBtn').classList.add('loading');loadProfile(currentPlayer,$('#profileSelect').value,true)});
+$('#equipmentCard').addEventListener('click',()=>openWardrobe('armorSets'));
+$('#storageCard').addEventListener('click',()=>openWardrobe('inventory'));
+$('#moduleNav').addEventListener('click',e=>{const button=e.target.closest('[data-module]');if(button)openModule(button.dataset.module)});
+$('#moduleContent').addEventListener('click',e=>{if(e.target.closest('#newNote')){const note={id:Date.now(),title:'Untitled note',body:'',updated:Date.now()};notebookNotes.unshift(note);activeNoteId=note.id;renderNotebookEditor();saveNotebook();return}const link=e.target.closest('[data-note-id]');if(link){activeNoteId=Number(link.dataset.noteId);renderNotebookEditor();return}if(e.target.closest('#deleteNote')){notebookNotes=notebookNotes.filter(x=>x.id!==activeNoteId);activeNoteId=notebookNotes[0]?.id||null;renderNotebookEditor();saveNotebook()}});
+$('#moduleContent').addEventListener('input',e=>{if(!['noteTitle','noteBody'].includes(e.target.id))return;const note=notebookNotes.find(x=>x.id===activeNoteId);if(!note)return;if(e.target.id==='noteTitle')note.title=e.target.value;if(e.target.id==='noteBody')note.body=e.target.value;note.updated=Date.now();saveNotebook()});
+document.querySelectorAll('[data-close-module]').forEach(el=>el.addEventListener('click',()=>closeModule()));
+document.querySelectorAll('[data-close-modal]').forEach(el=>el.addEventListener('click',()=>closeWardrobe()));
+$('#wardrobeTabs').addEventListener('click',e=>{const button=e.target.closest('[data-tab]');if(!button)return;document.querySelectorAll('#wardrobeTabs button').forEach(x=>x.classList.toggle('active',x===button));renderWardrobe(button.dataset.tab);setRoute(button.dataset.tab)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeWardrobe()});
+let tooltipSlot=null,floatingTooltip=null;
+function placeFloatingTooltip(){if(!tooltipSlot||!floatingTooltip)return;const slot=tooltipSlot.getBoundingClientRect(),tip=floatingTooltip.getBoundingClientRect(),gap=8,pad=8;let top=slot.top-tip.height-gap;if(top<pad)top=slot.bottom+gap;if(top+tip.height>innerHeight-pad)top=Math.max(pad,innerHeight-tip.height-pad);let left=slot.left+slot.width/2-tip.width/2;left=Math.max(pad,Math.min(left,innerWidth-tip.width-pad));floatingTooltip.style.top=`${Math.round(top)}px`;floatingTooltip.style.left=`${Math.round(left)}px`}
+function showFloatingTooltip(slot){const source=slot?.querySelector(':scope > .mc-tooltip');if(!source)return;if(tooltipSlot===slot)return;hideFloatingTooltip();tooltipSlot=slot;floatingTooltip=source.cloneNode(true);floatingTooltip.classList.add('floating-tooltip');floatingTooltip.removeAttribute('style');document.body.appendChild(floatingTooltip);requestAnimationFrame(placeFloatingTooltip)}
+function hideFloatingTooltip(){floatingTooltip?.remove();floatingTooltip=null;tooltipSlot=null}
+document.addEventListener('pointerover',e=>{const slot=e.target.closest('.inventory-slot,.set-item');if(slot)showFloatingTooltip(slot)});
+document.addEventListener('pointerout',e=>{const slot=e.target.closest('.inventory-slot,.set-item');if(slot&&!slot.contains(e.relatedTarget))hideFloatingTooltip()});
+document.addEventListener('scroll',placeFloatingTooltip,true);
+window.addEventListener('resize',placeFloatingTooltip);
+window.addEventListener('popstate',()=>{const tab=pathTabs[location.pathname],module=pathModules[location.pathname];if(tab){closeModule(false);openWardrobe(tab,false)}else if(module){openModule(module,false)}else{closeWardrobe(false);closeModule(false)}});
+$('#shareBtn').addEventListener('click', async()=>{if(!currentPlayer)return; const url=`${location.origin}${location.pathname}?player=${encodeURIComponent(currentPlayer)}`; await navigator.clipboard.writeText(url); showToast('Profile link copied');});
+$('#rotateBtn').addEventListener('click', e=>{viewer.autoRotate=!viewer.autoRotate;e.currentTarget.classList.toggle('active',viewer.autoRotate)});
+$('#resetBtn').addEventListener('click', ()=>{viewer.resetCameraPose();viewer.zoom=.82});
+function showToast(text){const t=$('#toast');t.textContent=text;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800)}
+window.addEventListener('resize',()=>{if(viewer)viewer.setSize($('#skinCanvas').clientWidth,$('#skinCanvas').clientHeight)});
+renderGoals(); renderSkills(); renderEquipment(); renderActivity();
+const sharedPlayer=new URLSearchParams(location.search).get('player')||'gffx';
+$('#playerInput').value=sharedPlayer;loadProfile(sharedPlayer);

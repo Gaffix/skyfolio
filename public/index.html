@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#090b0d" />
+  <link id="favicon" rel="icon" type="image/png" />
+  <title>Skyfolio — SkyBlock Profile</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <style>@font-face{font-family:Minecraft;src:url('https://cdn.jsdelivr.net/npm/skinview3d/assets/minecraft.woff2') format('woff2');font-display:swap}</style>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/styles.css" />
+  <link rel="stylesheet" href="/css/theme.css" />
+  <link rel="stylesheet" href="/css/modal.css" />
+  <link rel="stylesheet" href="/css/storage.css" />
+  <link rel="stylesheet" href="/css/compact.css" />
+  <link rel="stylesheet" href="/css/modules.css" />
+  <link rel="stylesheet" href="/css/tooltip.css" />
+  <link rel="stylesheet" href="/css/notebook.css" />
+  <link rel="stylesheet" href="/css/freshness.css" />
+</head>
+<body>
+  <div class="noise"></div>
+  <header class="topbar">
+    <a class="brand" href="#"><span class="brand-mark">S</span><span>SKYFOLIO</span></a>
+    <form class="search" id="searchForm">
+      <span>⌕</span><input id="playerInput" autocomplete="off" placeholder="Search a player…" />
+      <kbd>ENTER</kbd>
+    </form>
+    <nav><button class="icon-btn" aria-label="Theme">◐</button><button class="avatar">Y</button></nav>
+  </header>
+
+  <main>
+    <section class="profile-head">
+      <div class="identity">
+        <div class="mini-avatar"><canvas id="avatarCanvas" width="72" height="72" style="width:100%;height:100%;image-rendering:pixelated" aria-label="Player avatar"></canvas></div>
+        <div><div class="eyebrow">SKYBLOCK PROFILE</div><h1 id="playerName">Search a player</h1><div class="meta" id="profileMeta"><span class="status-dot"></span> Ready for live data</div></div>
+      </div>
+      <div class="profile-actions"><span class="freshness" id="freshness">Not loaded</span><button class="refresh-btn" id="refreshBtn" title="Refresh API data">↻</button><select id="profileSelect" aria-label="Profile" disabled><option>Select profile</option></select><button class="share" id="shareBtn">↗ &nbsp; Share</button></div>
+    </section>
+    <nav class="module-nav" id="moduleNav"><button data-module="slayer">⚔ Slayer</button><button data-module="dungeons">♜ Dungeons</button><button data-module="pets">♞ Pets</button><button data-module="mining">⛏ Mining</button><button data-module="garden">☘ Garden</button><button data-module="bestiary">☠ Bestiary</button><button data-module="accessories">◆ Accessories</button><button data-module="mayor">♛ Mayor</button><button data-module="networth">◎ Net Worth</button><button data-module="notebook">▤ Notebook</button></nav>
+
+    <section class="dashboard-grid">
+      <aside class="left-col">
+        <article class="card overview">
+          <div class="card-title"><span>PROFILE OVERVIEW</span><b>•••</b></div>
+          <div class="level-block"><div class="level-ring" id="levelRing"><strong id="levelInteger">—</strong><span>LEVEL</span></div><div><small>SKYBLOCK LEVEL</small><strong class="level-number" id="skyblockLevel">—</strong><div class="progress"><span id="levelProgress" style="width:0"></span></div><em id="levelXp">Search to load stats</em></div></div>
+          <div class="stat-row"><span><b>⚔</b><small>Skill Average</small><strong id="skillAverage">—</strong></span><span><b>♜</b><small>Catacombs</small><strong id="catacombs">—</strong></span></div>
+          <div class="stat-row"><span><b>✦</b><small>Slayer XP</small><strong id="slayerXp">—</strong></span><span><b>◆</b><small>Profiles</small><strong id="profileCount">—</strong></span></div>
+        </article>
+        <article class="card purse"><div><small>PURSE</small><strong id="purse">—</strong></div><span>◎</span><div><small>BANK</small><strong id="bank">—</strong></div></article>
+        <article class="card activity"><div class="card-title"><span>RECENT ACTIVITY</span><a>LIVE PROFILE DATA</a></div><div id="activityList"></div></article>
+      </aside>
+
+      <section class="center-col">
+        <article class="character-stage">
+          <div class="stage-glow"></div><div class="stage-grid"></div>
+          <canvas id="skinCanvas"></canvas>
+          <div class="drag-hint">↔ &nbsp; DRAG TO ROTATE &nbsp; · &nbsp; SCROLL TO ZOOM</div>
+          <div class="skin-controls"><button id="rotateBtn" class="active" title="Toggle auto rotate">↻</button><button id="resetBtn" title="Reset camera">⌂</button></div>
+        </article>
+        <article class="card equipment" id="equipmentCard"><div class="card-title"><span>ARMOR & EQUIPMENT</span><button class="wardrobe-open" id="wardrobeOpen">OPEN WARDROBE →</button></div><div class="equipment-grid" id="equipmentGrid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:14px"></div></article>
+        <article class="card storage-card" id="storageCard"><div><div class="eyebrow">ITEM STORAGE</div><h3>Inventory & Backpacks</h3><small id="storageSummary">Loading storage…</small></div><button class="wardrobe-open">OPEN STORAGE →</button></article>
+      </section>
+
+      <aside class="right-col">
+        <article class="card planner">
+          <div class="planner-head"><div><div class="eyebrow">PERSONAL SPACE</div><h2>Quest Board</h2></div><span class="completion" id="completion">0%</span></div>
+          <form id="goalForm"><input id="goalInput" maxlength="80" placeholder="What do you want to do?"/><button aria-label="Add goal">+</button></form>
+          <div class="goals" id="goals"></div>
+          <button class="clear-complete" id="clearComplete">Clear completed</button>
+        </article>
+        <article class="card skills"><div class="card-title"><span>TOP SKILLS</span><a href="#">All skills</a></div><div id="skillsList"></div></article>
+        <article class="card collection"><div class="card-title"><span>COLLECTION PROGRESS</span><b id="collectionPercent">—</b></div><div class="collection-bar"><span id="collectionBar" style="width:0"></span></div><small id="collectionSummary">Search to load collection progress</small></article>
+      </aside>
+    </section>
+  </main>
+  <div class="modal" id="wardrobeModal" aria-hidden="true">
+    <div class="modal-backdrop" data-close-modal></div>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="wardrobeTitle">
+      <header><div><div class="eyebrow">SKYBLOCK STORAGE</div><h2 id="wardrobeTitle">Wardrobe & Storage</h2></div><button class="modal-close" data-close-modal aria-label="Close">×</button></header>
+      <nav class="modal-tabs" id="wardrobeTabs"><button class="active" data-tab="armorSets">Armor</button><button data-tab="equipmentSets">Equipment</button><button data-tab="loadouts">Loadouts</button><button data-tab="inventory">Inventory</button><button data-tab="enderChest">Ender Chest</button><button data-tab="backpacks">Backpacks</button><button data-tab="bags">Bags</button></nav>
+      <div class="modal-content" id="wardrobeContent"></div>
+    </section>
+  </div>
+  <div class="modal" id="moduleModal" aria-hidden="true"><div class="modal-backdrop" data-close-module></div><section class="modal-panel" role="dialog" aria-modal="true"><header><div><div class="eyebrow">LIVE PROFILE MODULE</div><h2 id="moduleTitle">Profile</h2></div><button class="modal-close" data-close-module>×</button></header><div class="modal-content" id="moduleContent"></div></section></div>
+  <div class="toast" id="toast"></div>
+  <script src="https://cdn.jsdelivr.net/npm/skinview3d@3.4.1/bundles/skinview3d.bundle.js"></script>
+  <script src="/js/app.js"></script>
+</body>
+</html>
