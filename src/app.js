@@ -57,6 +57,7 @@ function recentActivity(member){const events=[];for(const run of Object.values(m
 function ironpathStats(member,storage,loadouts,equipment){
   const counts={};
   const add=(id,count)=>{if(id&&Number(count)>0)counts[id]=(counts[id]||0)+Number(count)};
+  add('SKYBLOCK_COIN',first(member,['currencies.coin_purse','coin_purse']));
   const containers=[storage.inventory,storage.enderChest,storage.personalVault,...storage.backpacks.map(x=>x.items),...storage.bags.map(x=>x.items),equipment,...loadouts.armorSets.map(x=>x.items),...loadouts.equipmentSets.map(x=>x.items)];
   for(const items of containers)for(const item of items||[])if(item)add(item.id,item.count);
   for(const sack of storage.sacks||[])add(sack.id,sack.count);
