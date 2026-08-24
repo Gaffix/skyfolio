@@ -36,6 +36,16 @@ body {
   background: #2b1016;
 }
 
+.purse {
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.purse > div + div {
+  border-left: 1px solid var(--line);
+  padding-left: 18px;
+}
+
 .character-stage {
   border-color: #43232a;
   background:

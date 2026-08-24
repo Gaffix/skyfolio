@@ -134,6 +134,7 @@ function openModule(type,updateRoute=true){closeWardrobe(false);if(type==='noteb
 function closeModule(updateRoute=true){$('#moduleModal').classList.remove('open');$('#moduleModal').setAttribute('aria-hidden','true');document.body.style.overflow='';document.querySelectorAll('#moduleNav button').forEach(x=>x.classList.remove('active'));if(updateRoute)history.pushState({},'',`/${location.search}`)}
 function applyProfile(data) {
   const p=data.profile; currentPlayer=p.username;currentProfile=p;
+  document.title=`Skyfolio - ${p.username}`;
   profileMeta=data.meta||null;updateFreshness();clearInterval(freshnessTimer);freshnessTimer=setInterval(updateFreshness,1000);
   syncGoals(p.username);
   $('#playerName').textContent=p.username;
