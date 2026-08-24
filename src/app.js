@@ -57,7 +57,7 @@ function recentActivity(member){const events=[];for(const run of Object.values(m
 function ironpathStats(member,storage,loadouts,equipment){
   const counts={};
   const add=(id,count)=>{if(id&&Number(count)>0)counts[id]=(counts[id]||0)+Number(count)};
-  const containers=[storage.inventory,storage.enderChest,storage.personalVault,...storage.backpacks.map(x=>x.items),...storage.bags.map(x=>x.items),equipment,...loadouts.armorSets.flatMap(x=>x.items),...loadouts.equipmentSets.flatMap(x=>x.items)];
+  const containers=[storage.inventory,storage.enderChest,storage.personalVault,...storage.backpacks.map(x=>x.items),...storage.bags.map(x=>x.items),equipment,...loadouts.armorSets.map(x=>x.items),...loadouts.equipmentSets.map(x=>x.items)];
   for(const items of containers)for(const item of items||[])if(item)add(item.id,item.count);
   for(const sack of storage.sacks||[])add(sack.id,sack.count);
   const processRoot=member.forge?.forge_processes||member.mining_core?.forge_processes||{};
@@ -66,7 +66,8 @@ function ironpathStats(member,storage,loadouts,equipment){
     return{slot,id,name:recipe?.name||itemName(id),startedAt,duration:recipe?.duration||0,finishesAt:startedAt&&recipe?.duration?startedAt+recipe.duration*1000:null};
   }).filter(x=>x.startedAt).sort((a,b)=>a.startedAt-b.startedAt);
   const core=member.mining_core||{};
-  return{counts,recipes:forgeRecipes.map(recipe=>({...recipe,ingredients:Object.entries(recipe.ingredients).map(([id,count])=>({id,name:itemName(id),count}))})),processes,hotm:Number(core.nodes?.special_0||core.tier||0),sacksAvailable:Object.prototype.hasOwnProperty.call(member.inventory||{},'sacks_counts')||Object.prototype.hasOwnProperty.call(member,'sacks_counts')};
+  const icon=id=>`https://sky.shiiyu.moe/api/item/${encodeURIComponent(id)}`;
+  return{counts,recipes:forgeRecipes.map(recipe=>({...recipe,icon:icon(recipe.id),ingredients:Object.entries(recipe.ingredients).map(([id,count])=>({id,name:itemName(id),count,icon:icon(id)}))})),processes,hotm:Number(core.nodes?.special_0||core.tier||0),sacksAvailable:Object.prototype.hasOwnProperty.call(member.inventory||{},'sacks_counts')||Object.prototype.hasOwnProperty.call(member,'sacks_counts')};
 }
 function shapeProfile(profile, uuid, username, count, collectionResources, garden, bazaar, election) {
   const member = memberOf(profile, uuid) || {};
