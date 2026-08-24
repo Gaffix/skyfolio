@@ -11,6 +11,7 @@ let collectionResources={time:0,data:null};
 let bazaarResources={time:0,data:null};
 let electionResources={time:0,data:null};
 const gardenCache=new Map();
+const itemTextureCache=new Map();
 
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function fetchWithRetry(url,options={},attempts=2){let lastError,lastResponse;for(let attempt=0;attempt<attempts;attempt++){try{const response=await fetch(url,{...options,signal:AbortSignal.timeout(8000)});lastResponse=response;if(response.status!==429&&response.status<500)return response}catch(error){lastError=error}if(attempt+1<attempts)await wait(250*(attempt+1))}if(lastResponse)return lastResponse;const host=new URL(url).hostname;throw Object.assign(new Error(`Could not reach ${host}. Check your connection and try again.`),{status:502,cause:lastError})}
@@ -67,7 +68,7 @@ function ironpathStats(member,storage,loadouts,equipment){
     return{slot,id,name:recipe?.name||itemName(id),startedAt,duration:recipe?.duration||0,finishesAt:startedAt&&recipe?.duration?startedAt+recipe.duration*1000:null};
   }).filter(x=>x.startedAt).sort((a,b)=>a.startedAt-b.startedAt);
   const core=member.mining_core||{};
-  const icon=id=>`https://sky.shiiyu.moe/api/item/${encodeURIComponent(id)}`;
+  const icon=id=>`/api/item-texture/${encodeURIComponent(id)}`;
   return{counts,recipes:forgeRecipes.map(recipe=>({...recipe,icon:icon(recipe.id),ingredients:Object.entries(recipe.ingredients).map(([id,count])=>({id,name:itemName(id),count,icon:icon(id)}))})),processes,hotm:Number(core.nodes?.special_0||core.tier||0),sacksAvailable:Object.prototype.hasOwnProperty.call(member.inventory||{},'sacks_counts')||Object.prototype.hasOwnProperty.call(member,'sacks_counts')};
 }
 function shapeProfile(profile, uuid, username, count, collectionResources, garden, bazaar, election) {
@@ -101,6 +102,7 @@ function shapeProfile(profile, uuid, username, count, collectionResources, garde
 
 async function getSkin(username){const player=await resolvePlayer(username);const sessionRes=await fetch(`https://sessionserver.mojang.com/session/minecraft/profile/${player.id}`);if(!sessionRes.ok)throw Object.assign(new Error('Skin profile unavailable.'),{status:502});const session=await sessionRes.json();const texture=session.properties?.find(x=>x.name==='textures');const skinUrl=texture&&JSON.parse(Buffer.from(texture.value,'base64').toString('utf8')).textures?.SKIN?.url;if(!skinUrl||new URL(skinUrl).hostname!=='textures.minecraft.net')throw Object.assign(new Error('This player has no custom skin.'),{status:404});const image=await fetch(skinUrl);if(!image.ok)throw Object.assign(new Error('Skin image unavailable.'),{status:502});return Buffer.from(await image.arrayBuffer())}
 async function getAvatar(username){const player=await resolvePlayer(username);const image=await fetch(`https://mc-heads.net/avatar/${player.id}/72`);if(!image.ok)throw Object.assign(new Error('Player head unavailable.'),{status:502});return Buffer.from(await image.arrayBuffer())}
+async function getItemTexture(id){if(itemTextureCache.has(id))return itemTextureCache.get(id);let response;try{response=await fetchWithRetry(`https://sky.shiiyu.moe/api/item/${encodeURIComponent(id)}`,{},2)}catch{}if(!response?.ok)response=await fetch('https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.21.4/assets/minecraft/textures/item/paper.png');const image=Buffer.from(await response.arrayBuffer());itemTextureCache.set(id,image);return image}
 
 async function getProfile(username, requestedId, force=false) {
   if (!hypixelApiKey) throw Object.assign(new Error('Missing HYPIXEL_API_KEY. Add it to the .env file and restart the server.'), { status: 503 });
@@ -127,6 +129,7 @@ function createServer(){return http.createServer(async (req, res) => {
     if(url.pathname.startsWith('/api/ironpath/')){const player=decodeURIComponent(url.pathname.slice(14)).toLowerCase(),profile=String(url.searchParams.get('profile')||'default').replace(/[^a-zA-Z0-9-]/g,'').slice(0,64);if(!/^[a-z0-9_]{1,16}$/.test(player))throw Object.assign(new Error('Invalid player.'),{status:400});const all=readIronpath(),key=`${player}:${profile}`;if(req.method==='GET'){res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});return res.end(JSON.stringify({goals:all[key]||[]}))}if(req.method==='PUT'){const body=await readJsonBody(req),goals=Array.isArray(body.goals)?body.goals.slice(0,20).map(x=>({id:Number(x.id)||Date.now(),recipeId:String(x.recipeId||''),quantity:Math.max(1,Math.min(64,Number(x.quantity)||1))})).filter(x=>recipeById[x.recipeId]):[];all[key]=goals;writeIronpath(all);res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({goals}))}throw Object.assign(new Error('Method not allowed.'),{status:405})}
     if(url.pathname.startsWith('/api/skin/')){const username=decodeURIComponent(url.pathname.slice(10));if(!/^[A-Za-z0-9_]{1,16}$/.test(username))throw Object.assign(new Error('Invalid username.'),{status:400});const skin=await getSkin(username);res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'public, max-age=3600'});return res.end(skin)}
     if(url.pathname.startsWith('/api/avatar/')){const username=decodeURIComponent(url.pathname.slice(12));if(!/^[A-Za-z0-9_]{1,16}$/.test(username))throw Object.assign(new Error('Invalid username.'),{status:400});const avatar=await getAvatar(username);res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'public, max-age=3600'});return res.end(avatar)}
+    if(url.pathname.startsWith('/api/item-texture/')){const id=decodeURIComponent(url.pathname.slice(18));if(!/^[A-Za-z0-9_;:-]{1,80}$/.test(id))throw Object.assign(new Error('Invalid item id.'),{status:400});const image=await getItemTexture(id);res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'public, max-age=86400'});return res.end(image)}
     if (url.pathname.startsWith('/api/profile/')) {
       const username = decodeURIComponent(url.pathname.slice('/api/profile/'.length));
       if (!/^[A-Za-z0-9_]{1,16}$/.test(username)) throw Object.assign(new Error('Enter a valid Minecraft username.'), { status:400 });
