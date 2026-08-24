@@ -3,8 +3,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { publicRoot, profileCacheMs: CACHE_MS, hypixelApiKey } = require('./config');
-const { readGoals, writeGoals, readNotebook, writeNotebook } = require('./data-store');
+const { readGoals, writeGoals, readNotebook, writeNotebook, readIronpath, writeIronpath } = require('./data-store');
 const { cleanName, titleCase, readEquipment, readLoadouts, readStorage, accessoryStats } = require('./items');
+const { recipes: forgeRecipes, recipeById, itemName } = require('./forge-recipes');
 const cache = new Map();
 let collectionResources={time:0,data:null};
 let bazaarResources={time:0,data:null};
@@ -50,6 +51,20 @@ function bestiaryStats(member){const kills=member.bestiary?.kills||{};const mobs
 function networthStats(profile,member,storage,loadouts,bazaar){const containers=[storage.inventory,storage.enderChest,storage.personalVault,...storage.backpacks.map(x=>x.items),...storage.bags.map(x=>x.items),...loadouts.armorSets.map(x=>x.items),...loadouts.equipmentSets.map(x=>x.items)];const values={inventory:0,storage:0,wardrobe:0};containers.forEach((items,index)=>{for(const item of items||[]){if(!item)continue;const price=Number(bazaar[item.id]?.quick_status?.sellPrice||0)*Number(item.count||1);if(index===0)values.inventory+=price;else if(index<3+storage.backpacks.length+storage.bags.length)values.storage+=price;else values.wardrobe+=price}});const purse=Number(first(member,['currencies.coin_purse','coin_purse'])),bank=Number(first(profile,['banking.balance']));return{purse,bank,...values,total:purse+bank+values.inventory+values.storage+values.wardrobe,note:'Liquid coins plus Bazaar-sellable items; auction-only items and pets are not priced.'}}
 function collectionProgress(member,resources){const amounts=member.collection||{};let total=0,maxed=0,tiersCompleted=0,totalTiers=0;for(const category of Object.values(resources||{})){for(const [id,item] of Object.entries(category.items||{})){const tiers=item.tiers||[];if(!tiers.length)continue;total++;totalTiers+=tiers.length;const amount=Number(amounts[id]||0);const completed=tiers.filter(t=>amount>=Number(t.amountRequired||0)).length;tiersCompleted+=completed;if(completed===tiers.length)maxed++}}return{maxed,total,tiersCompleted,totalTiers,percent:totalTiers?Math.round(tiersCompleted/totalTiers*100):0}}
 function recentActivity(member){const events=[];for(const run of Object.values(member.dungeons?.treasures?.runs||{})){if(run?.completion_ts)events.push({type:'dungeon',title:'Dungeon completed',detail:`${cleanName(run.dungeon_type||'Catacombs')} Floor ${run.dungeon_tier??'?'}`,timestamp:run.completion_ts})}for(const shard of member.shards?.owned||[]){if(shard?.captured)events.push({type:'shard',title:'Shard captured',detail:cleanName(String(shard.type||'Unknown').replaceAll('_',' ')),timestamp:shard.captured})}for(const [id,objective] of Object.entries(member.objectives||{})){const timestamp=objective?.completed_at||objective?.completedAt;if(timestamp)events.push({type:'objective',title:'Objective completed',detail:cleanName(id.replaceAll('_',' ')),timestamp})}return events.filter(x=>Number(x.timestamp)>0&&Number(x.timestamp)<Date.now()+300000).sort((a,b)=>b.timestamp-a.timestamp).slice(0,5)}
+function ironpathStats(member,storage,loadouts,equipment){
+  const counts={};
+  const add=(id,count)=>{if(id&&Number(count)>0)counts[id]=(counts[id]||0)+Number(count)};
+  const containers=[storage.inventory,storage.enderChest,storage.personalVault,...storage.backpacks.map(x=>x.items),...storage.bags.map(x=>x.items),equipment,...loadouts.armorSets.flatMap(x=>x.items),...loadouts.equipmentSets.flatMap(x=>x.items)];
+  for(const items of containers)for(const item of items||[])if(item)add(item.id,item.count);
+  for(const sack of storage.sacks||[])add(sack.id,sack.count);
+  const processRoot=member.forge?.forge_processes||member.mining_core?.forge_processes||{};
+  const processes=Object.values(processRoot).flatMap(group=>Object.entries(group||{})).map(([slot,process])=>{
+    const id=String(process?.id||'UNKNOWN'),recipe=recipeById[id],startedAt=Number(process?.startTime||process?.start_time||0);
+    return{slot,id,name:recipe?.name||itemName(id),startedAt,duration:recipe?.duration||0,finishesAt:startedAt&&recipe?.duration?startedAt+recipe.duration*1000:null};
+  }).filter(x=>x.startedAt).sort((a,b)=>a.startedAt-b.startedAt);
+  const core=member.mining_core||{};
+  return{counts,recipes:forgeRecipes.map(recipe=>({...recipe,ingredients:Object.entries(recipe.ingredients).map(([id,count])=>({id,name:itemName(id),count}))})),processes,hotm:Number(core.nodes?.special_0||core.tier||0),sacksAvailable:Object.prototype.hasOwnProperty.call(member.inventory||{},'sacks_counts')||Object.prototype.hasOwnProperty.call(member,'sacks_counts')};
+}
 function shapeProfile(profile, uuid, username, count, collectionResources, garden, bazaar, election) {
   const member = memberOf(profile, uuid) || {};
   const skillNames = ['combat','farming','mining','foraging','fishing','enchanting','alchemy','taming'];
@@ -75,7 +90,7 @@ function shapeProfile(profile, uuid, username, count, collectionResources, garde
     skyblockLevel: levelXp / 100,
     skillAverage: availableSkills.length ? availableSkills.reduce((a,b)=>a+b,0) / availableSkills.length : 0,
     catacombs: levelFromXp(cataXp, dungeonXp), slayerXp, skills, equipment, loadouts, storage, collections: collectionProgress(member,collectionResources), activity: recentActivity(member),
-    slayers:slayerStats(member),dungeonDetails:dungeonStats(member),pets:petStats(member),mining:miningStats(member),garden:gardenStats(member,garden),bestiary:bestiaryStats(member),networth:networthStats(profile,member,storage,loadouts,bazaar),accessories:accessoryStats(member,storage),mayor:election
+    slayers:slayerStats(member),dungeonDetails:dungeonStats(member),pets:petStats(member),mining:miningStats(member),garden:gardenStats(member,garden),bestiary:bestiaryStats(member),networth:networthStats(profile,member,storage,loadouts,bazaar),accessories:accessoryStats(member,storage),mayor:election,ironpath:ironpathStats(member,storage,loadouts,equipment)
   };
 }
 
@@ -105,6 +120,7 @@ function createServer(){return http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     if(url.pathname.startsWith('/api/goals/')){const player=decodeURIComponent(url.pathname.slice(11)).toLowerCase();if(!/^[a-z0-9_]{1,16}$/.test(player))throw Object.assign(new Error('Invalid player.'),{status:400});const all=readGoals();if(req.method==='GET'){res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});return res.end(JSON.stringify({goals:all[player]||[]}))}if(req.method==='PUT'){const body=await readJsonBody(req),goals=Array.isArray(body.goals)?body.goals.slice(0,100).map(x=>({id:Number(x.id)||Date.now(),text:String(x.text||'').slice(0,80),done:Boolean(x.done)})).filter(x=>x.text):[];all[player]=goals;writeGoals(all);res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({goals}))}throw Object.assign(new Error('Method not allowed.'),{status:405})}
     if(url.pathname.startsWith('/api/notebook/')){const player=decodeURIComponent(url.pathname.slice(14)).toLowerCase();if(!/^[a-z0-9_]{1,16}$/.test(player))throw Object.assign(new Error('Invalid player.'),{status:400});const all=readNotebook();if(req.method==='GET'){res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});return res.end(JSON.stringify({notes:all[player]||[]}))}if(req.method==='PUT'){const body=await readJsonBody(req),notes=Array.isArray(body.notes)?body.notes.slice(0,100).map(x=>({id:Number(x.id)||Date.now(),title:String(x.title||'Untitled').slice(0,80),body:String(x.body||'').slice(0,20000),updated:Number(x.updated)||Date.now()})):[];all[player]=notes;writeNotebook(all);res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({notes}))}throw Object.assign(new Error('Method not allowed.'),{status:405})}
+    if(url.pathname.startsWith('/api/ironpath/')){const player=decodeURIComponent(url.pathname.slice(14)).toLowerCase(),profile=String(url.searchParams.get('profile')||'default').replace(/[^a-zA-Z0-9-]/g,'').slice(0,64);if(!/^[a-z0-9_]{1,16}$/.test(player))throw Object.assign(new Error('Invalid player.'),{status:400});const all=readIronpath(),key=`${player}:${profile}`;if(req.method==='GET'){res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});return res.end(JSON.stringify({goals:all[key]||[]}))}if(req.method==='PUT'){const body=await readJsonBody(req),goals=Array.isArray(body.goals)?body.goals.slice(0,20).map(x=>({id:Number(x.id)||Date.now(),recipeId:String(x.recipeId||''),quantity:Math.max(1,Math.min(64,Number(x.quantity)||1))})).filter(x=>recipeById[x.recipeId]):[];all[key]=goals;writeIronpath(all);res.writeHead(200,{'Content-Type':'application/json'});return res.end(JSON.stringify({goals}))}throw Object.assign(new Error('Method not allowed.'),{status:405})}
     if(url.pathname.startsWith('/api/skin/')){const username=decodeURIComponent(url.pathname.slice(10));if(!/^[A-Za-z0-9_]{1,16}$/.test(username))throw Object.assign(new Error('Invalid username.'),{status:400});const skin=await getSkin(username);res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'public, max-age=3600'});return res.end(skin)}
     if(url.pathname.startsWith('/api/avatar/')){const username=decodeURIComponent(url.pathname.slice(12));if(!/^[A-Za-z0-9_]{1,16}$/.test(username))throw Object.assign(new Error('Invalid username.'),{status:400});const avatar=await getAvatar(username);res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'public, max-age=3600'});return res.end(avatar)}
     if (url.pathname.startsWith('/api/profile/')) {
@@ -113,7 +129,7 @@ function createServer(){return http.createServer(async (req, res) => {
       const body = await getProfile(username, url.searchParams.get('profile'),url.searchParams.get('refresh')==='1');
       res.writeHead(200, {'Content-Type':'application/json','Cache-Control':'private, max-age=60'}); return res.end(JSON.stringify(body));
     }
-    const appRoutes=new Set(['/inventory','/ender-chest','/backpacks','/bags','/wardrobe','/equipment','/loadouts','/slayer','/dungeons','/pets','/mining','/garden','/bestiary','/networth','/notebook','/accessories','/mayor']);
+    const appRoutes=new Set(['/inventory','/ender-chest','/backpacks','/bags','/sacks','/wardrobe','/equipment','/loadouts','/slayer','/dungeons','/pets','/mining','/garden','/bestiary','/networth','/notebook','/accessories','/mayor','/ironpath']);
     const pathname = url.pathname === '/' || appRoutes.has(url.pathname) ? '/index.html' : url.pathname;
     const file = path.resolve(publicRoot, `.${pathname}`);
     if (!file.startsWith(publicRoot) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end('Not found'); }

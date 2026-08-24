@@ -18,7 +18,7 @@ npm start
 
 3. Visit `http://localhost:5173` and search a Minecraft username.
 
-The API key is read only by the server configuration; `.env` is gitignored and is never sent to the browser. Profile responses are cached for five minutes to respect Hypixel's rate limits. Live modules include progression, storage, collections, activity, Slayers, Dungeons, pets, mining, Garden, Bestiary, accessories, Mayor data, and an estimated net worth. Minecraft skins are resolved through Mojang's session service and proxied locally.
+The API key is read only by the server configuration; `.env` is gitignored and is never sent to the browser. Profile responses are cached for five minutes to respect Hypixel's rate limits. Live modules include progression, storage (including sacks), collections, activity, Slayers, Dungeons, pets, mining, Garden, Bestiary, accessories, Mayor data, an estimated net worth, and IronPath. IronPath compares saved Dwarven Forge goals with an Ironman player's accessible materials and active forge processes. Minecraft skins are resolved through Mojang's session service and proxied locally.
 
 ## Project structure
 
@@ -33,6 +33,7 @@ src/
   config.js        Environment variables and shared paths
   data-store.js    Goals and notebook persistence
   items.js         Minecraft NBT and SkyBlock item parsing
+  forge-recipes.js Curated Dwarven Forge recipes and durations
 data/              Local goals and notebook data (gitignored)
 .env               Private local configuration (gitignored)
 ```
