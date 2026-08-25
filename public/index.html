@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="/css/notebook.css" />
   <link rel="stylesheet" href="/css/freshness.css" />
   <link rel="stylesheet" href="/css/ironpath.css" />
+  <link rel="stylesheet" href="/css/polish.css" />
 </head>
 <body>
   <div class="noise"></div>
@@ -33,6 +34,11 @@
   </header>
 
   <main>
+    <div class="profile-state" id="profileState" role="status" aria-live="polite" hidden>
+      <span class="profile-state-spinner" aria-hidden="true"></span>
+      <div><strong id="profileStateTitle">Loading profile</strong><small id="profileStateCopy">Contacting Hypixel…</small></div>
+      <button id="profileRetry" type="button" hidden>Try again</button>
+    </div>
     <section class="profile-head">
       <div class="identity">
         <div class="mini-avatar"><canvas id="avatarCanvas" width="72" height="72" style="width:100%;height:100%;image-rendering:pixelated" aria-label="Player avatar"></canvas></div>

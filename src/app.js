@@ -137,7 +137,8 @@ function createServer(){return http.createServer(async (req, res) => {
       res.writeHead(200, {'Content-Type':'application/json','Cache-Control':'private, max-age=60'}); return res.end(JSON.stringify(body));
     }
     const appRoutes=new Set(['/inventory','/ender-chest','/backpacks','/bags','/sacks','/wardrobe','/equipment','/loadouts','/slayer','/dungeons','/pets','/mining','/garden','/bestiary','/networth','/notebook','/accessories','/mayor','/ironpath']);
-    const pathname = url.pathname === '/' || appRoutes.has(url.pathname) ? '/index.html' : url.pathname;
+    const playerRoute=/^\/[A-Za-z0-9_]{1,16}(?:\/(?:inventory|ender-chest|backpacks|bags|sacks|wardrobe|equipment|loadouts|slayer|dungeons|pets|mining|garden|bestiary|networth|notebook|accessories|mayor|ironpath))?\/?$/;
+    const pathname = url.pathname === '/' || appRoutes.has(url.pathname) || playerRoute.test(url.pathname) ? '/index.html' : url.pathname;
     const file = path.resolve(publicRoot, `.${pathname}`);
     if (!file.startsWith(publicRoot) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); return res.end('Not found'); }
     res.writeHead(200, {'Content-Type':types[path.extname(file)] || 'application/octet-stream'}); fs.createReadStream(file).pipe(res);

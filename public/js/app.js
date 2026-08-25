@@ -18,6 +18,10 @@ const tabPaths={armorSets:'/wardrobe',equipmentSets:'/equipment',loadouts:'/load
 const pathTabs=Object.fromEntries(Object.entries(tabPaths).map(([tab,path])=>[path,tab]));
 const modulePaths={ironpath:'/ironpath',slayer:'/slayer',dungeons:'/dungeons',pets:'/pets',mining:'/mining',garden:'/garden',bestiary:'/bestiary',accessories:'/accessories',mayor:'/mayor',networth:'/networth',notebook:'/notebook'};
 const pathModules=Object.fromEntries(Object.entries(modulePaths).map(([key,path])=>[path,key]));
+const knownPages=new Set([...Object.values(tabPaths),...Object.values(modulePaths)]);
+function readRoute(){const path=location.pathname.replace(/\/+$/,'')||'/',legacyTab=pathTabs[path],legacyModule=pathModules[path],queryPlayer=new URLSearchParams(location.search).get('player')||'';if(legacyTab||legacyModule)return{player:queryPlayer,tab:legacyTab,module:legacyModule,page:path};const parts=path.split('/').filter(Boolean),player=/^[A-Za-z0-9_]{1,16}$/.test(parts[0]||'')?decodeURIComponent(parts[0]):queryPlayer,page=parts[1]?`/${parts[1]}`:'';return{player,tab:pathTabs[page],module:pathModules[page],page:knownPages.has(page)?page:''}}
+function profileUrl(page=''){const player=currentPlayer||readRoute().player||'gffx';return`/${encodeURIComponent(player)}${page}`}
+function normalizeRoute(player){const route=readRoute(),page=route.page||'';history.replaceState({player,page},'',`/${encodeURIComponent(player)}${page}`)}
 let notebookNotes=[],activeNoteId=null,notebookTimer;
 let ironpathGoals=[],ironpathKey='',ironpathTimer,ironpathCategory='all';
 const ironpathCategories={materials:'Materials',drill_parts:'Drill parts',drills:'Drills',pets:'Pets',armor:'Armor',accessories:'Accessories',tools:'Tools',beacons:'Beacons',travel:'Travel & utility',other:'Other'};
@@ -32,7 +36,7 @@ function ironpathPlanWithExcess(recipeId,quantity){
   return plan;
 }
 function ironpathTextureFallback(){return'https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.21.4/assets/minecraft/textures/item/paper.png'}
-function renderForgeTree(nodes,icon){return nodes.map(node=>{const expandable=node.children.length>0,fallback=ironpathTextureFallback();return`<div class="forge-tree-branch"><div class="forge-tree-row ${node.isRecipe?'component':'raw'} ${expandable?'expandable':''} ${node.ready?'ready':'missing'} ${node.surplus?'surplus':''}" style="--depth:${node.depth}" ${expandable?'data-forge-toggle role="button" tabindex="0" aria-expanded="true"':''}><span class="forge-tree-guide">${expandable?'▾':'·'}</span><img src="${node.icon||icon(node.id)}" data-fallback="${fallback}" alt="" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback=''}else this.hidden=true"><b>${escapeHtml(node.name)}</b><small>${number.format(node.owned)}/${number.format(node.amount)}</small></div>${expandable?`<div class="forge-tree-children">${renderForgeTree(node.children,icon)}</div>`:''}</div>`}).join('')}
+function renderForgeTree(nodes,icon){return nodes.map(node=>{const expandable=node.children.length>0,fallback=ironpathTextureFallback();return`<div class="forge-tree-branch"><div class="forge-tree-row ${node.isRecipe?'component':'raw'} ${expandable?'expandable':''} ${node.ready?'ready':'missing'} ${node.surplus?'surplus':''}" style="--depth:${node.depth}" ${expandable?'data-forge-toggle role="button" tabindex="0" aria-expanded="false"':''}><span class="forge-tree-guide">${expandable?'▸':'·'}</span><img src="${node.icon||icon(node.id)}" data-fallback="${fallback}" alt="" onerror="if(this.dataset.fallback){this.src=this.dataset.fallback;this.dataset.fallback=''}else this.hidden=true"><b>${escapeHtml(node.name)}</b><small>${number.format(node.owned)}/${number.format(node.amount)}</small></div>${expandable?`<div class="forge-tree-children" hidden>${renderForgeTree(node.children,icon)}</div>`:''}</div>`}).join('')}
 function drawIronpathOrganized(){
   const data=currentProfile?.ironpath||{recipes:[],processes:[],counts:{}},recipes=data.recipes||[],recipeFor=id=>recipes.find(x=>x.id===id),categories=[...new Set(recipes.map(x=>x.category||'materials'))],icon=id=>`https://sky.shiiyu.moe/api/item/${encodeURIComponent(id)}`;
   const sackTotal=(currentProfile.storage?.sacks||[]).reduce((sum,x)=>sum+x.count,0);
@@ -45,7 +49,7 @@ function drawIronpathOrganized(){
   clearInterval(ironpathTimer);ironpathTimer=setInterval(()=>document.querySelectorAll('[data-finish]').forEach(el=>el.textContent=durationText((Number(el.dataset.finish)-Date.now())/1000)),1000);
 }
 let profileMeta=null,freshnessTimer;
-function setRoute(tab,replace=false){const path=tabPaths[tab]||'/';const url=`${path}${location.search}`;history[replace?'replaceState':'pushState']({tab},'',url)}
+function setRoute(tab,replace=false){const page=tabPaths[tab]||'';history[replace?'replaceState':'pushState']({tab},'',profileUrl(page))}
 
 function renderAvatar(name) {
   const canvas=$('#avatarCanvas'), ctx=canvas.getContext('2d'), skin=new Image();
@@ -130,8 +134,8 @@ async function saveIronpath(){if(!currentPlayer||!currentProfile)return;await fe
 function drawIronpath(){const data=currentProfile?.ironpath||{recipes:[],processes:[],counts:{}},recipes=data.recipes||[],sackTotal=(currentProfile.storage?.sacks||[]).reduce((sum,x)=>sum+x.count,0);$('#moduleTitle').textContent='IronPath · Dwarven Forge';const slots=data.processes?.length?data.processes.map(x=>`<div class="forge-process"><span>${escapeHtml(x.name)}</span><small data-finish="${x.finishesAt||0}">${x.finishesAt?durationText((x.finishesAt-Date.now())/1000):'Time unavailable'}</small></div>`).join(''):'<p class="ironpath-note">No active forge processes were exposed by this profile.</p>';const goals=ironpathGoals.map(goal=>{const recipe=recipes.find(x=>x.id===goal.recipeId);if(!recipe)return'';const plan=ironpathPlan(goal.recipeId,goal.quantity);return`<article class="ironpath-goal"><header><div><h3>${goal.quantity>1?`${goal.quantity}× `:''}${escapeHtml(recipe.name)}</h3><small>HOTM ${recipe.hotm} · ${durationText(plan.time)} base forge work remaining</small></div><button class="ironpath-remove" data-ironpath-remove="${goal.id}">Remove</button></header><div class="ironpath-progress"><span style="width:${plan.percent}%"></span></div><div class="material-list">${plan.materials.map(item=>`<div class="material-row ${item.missing?'':'ready'}"><b>${escapeHtml(item.name)}</b><span>${number.format(item.needed-item.missing)} / ${number.format(item.needed)}</span><small>${item.missing?`${number.format(item.missing)} missing`:'READY'}</small></div>`).join('')}</div></article>`}).join('');$('#moduleContent').innerHTML=`<div class="ironpath"><section class="ironpath-hero"><div class="ironpath-summary"><div class="eyebrow">IRONMAN PROGRESSION</div><h3>Your forge route, from what you actually own</h3><p>IronPath combines inventory, Ender Chest, backpacks, bags, wardrobe and sacks. Intermediate forge items are consumed before their ingredients are expanded.</p><div class="ironpath-kpis"><div><strong>${data.hotm||0}</strong><small>HOTM</small></div><div><strong>${number.format(Object.keys(data.counts||{}).length)}</strong><small>Tracked items</small></div><div><strong>${compact(sackTotal)}</strong><small>In sacks</small></div></div></div><div class="forge-slots"><div class="eyebrow">ACTIVE FORGE</div><h3>${data.processes?.length||0} slot${data.processes?.length===1?'':'s'} running</h3>${slots}</div></section><form class="ironpath-add" id="ironpathAdd"><select id="ironpathRecipe">${recipes.map(x=>`<option value="${x.id}">${escapeHtml(x.name)} · HOTM ${x.hotm}</option>`).join('')}</select><input id="ironpathQuantity" type="number" min="1" max="64" value="1" aria-label="Quantity"><button>Add goal</button></form><div class="ironpath-goals">${goals||'<div class="notebook-empty"><b>No forge goals yet</b><span>Choose an item above to calculate its complete material route.</span></div>'}</div><p class="ironpath-note">Times use base forge durations; Quick Forge and mayor perks can shorten them. ${data.sacksAvailable?'Sack counts are included.':'Sack data is unavailable because inventory API access is disabled or not exposed.'}</p></div>`;clearInterval(ironpathTimer);ironpathTimer=setInterval(()=>document.querySelectorAll('[data-finish]').forEach(el=>el.textContent=durationText((Number(el.dataset.finish)-Date.now())/1000)),1000)}
 async function renderIronpath(){if(!currentPlayer||!currentProfile)return;const key=`${currentPlayer.toLowerCase()}:${currentProfile.id}`;$('#moduleTitle').textContent='IronPath';$('#moduleContent').innerHTML='<p class="module-note">Loading forge goals…</p>';if(ironpathKey!==key){try{const response=await fetch(`/api/ironpath/${encodeURIComponent(currentPlayer)}?profile=${encodeURIComponent(currentProfile.id)}`),data=await response.json();ironpathGoals=Array.isArray(data.goals)?data.goals:[]}catch{ironpathGoals=[]}ironpathKey=key}drawIronpath()}
 function renderSpecialModule(type){const p=currentProfile,n=x=>number.format(x||0);if(type==='accessories'){const a=p.accessories;$('#moduleTitle').textContent='Accessory Bag';$('#moduleContent').innerHTML=`<div class="module-grid">${statCard('Magical Power',n(a.magicalPower),[['Selected power',a.selectedPower],['Unique accessories',a.unique],['Bag upgrades',a.upgrades]],true)}${statCard('Unlocked Powers',a.unlockedPowers.length,a.unlockedPowers.map(x=>[x,'✓']))}${statCard('Tuning',a.tuning.length,a.tuning.map(x=>[x.name,`+${x.value}`]))}${statCard('Duplicates',a.duplicates.length,a.duplicates.map(x=>[x.name,`×${x.count}`]))}</div><h3>Accessory Bag · ${a.items.length} occupied slots</h3><div class="inventory-slots">${a.items.map(storageSlot).join('')}</div>`}if(type==='mayor'){const e=p.mayor,m=e.mayor||{},candidates=e.current?.candidates||[],total=candidates.reduce((s,x)=>s+Number(x.votes||0),0);$('#moduleTitle').textContent='Mayor & Election';$('#moduleContent').innerHTML=`<div class="module-grid"><article class="module-card featured"><small>CURRENT MAYOR</small><strong class="big">${escapeHtml(m.name||'Unknown')}</strong>${(m.perks||[]).map(x=>`<div style="margin-top:12px"><b>${escapeHtml(x.name)}</b><p class="module-note">${minecraftFormat(x.description)}</p></div>`).join('')}</article>${m.minister?`<article class="module-card"><small>MINISTER</small><strong class="big">${escapeHtml(m.minister.name)}</strong><b>${escapeHtml(m.minister.perk?.name||'')}</b><p class="module-note">${minecraftFormat(m.minister.perk?.description||'')}</p></article>`:''}</div><h3>Election Year ${e.current?.year||'—'}</h3><div class="module-grid">${candidates.sort((a,b)=>b.votes-a.votes).map(x=>statCard(x.name,total?`${Math.round(x.votes/total*100)}%`:[['Votes',n(x.votes)]],[['Votes',n(x.votes)],['Perks',x.perks?.length||0]],false)).join('')}</div><p class="module-note">Election data updated ${e.lastUpdated?new Date(e.lastUpdated).toLocaleString():'—'}.</p>`}}
-function openModule(type,updateRoute=true){closeWardrobe(false);if(type==='notebook')renderNotebook();else if(type==='ironpath')renderIronpath();else if(['accessories','mayor'].includes(type))renderSpecialModule(type);else renderModule(type);$('#moduleModal').classList.add('open');$('#moduleModal').setAttribute('aria-hidden','false');document.body.style.overflow='hidden';document.querySelectorAll('#moduleNav button').forEach(x=>x.classList.toggle('active',x.dataset.module===type));if(updateRoute)history.pushState({module:type},'',`${modulePaths[type]}${location.search}`)}
-function closeModule(updateRoute=true){$('#moduleModal').classList.remove('open');$('#moduleModal').setAttribute('aria-hidden','true');document.body.style.overflow='';document.querySelectorAll('#moduleNav button').forEach(x=>x.classList.remove('active'));if(updateRoute)history.pushState({},'',`/${location.search}`)}
+function openModule(type,updateRoute=true){closeWardrobe(false);if(type==='notebook')renderNotebook();else if(type==='ironpath')renderIronpath();else if(['accessories','mayor'].includes(type))renderSpecialModule(type);else renderModule(type);$('#moduleModal').classList.add('open');$('#moduleModal').setAttribute('aria-hidden','false');document.body.style.overflow='hidden';document.querySelectorAll('#moduleNav button').forEach(x=>x.classList.toggle('active',x.dataset.module===type));if(updateRoute)history.pushState({module:type},'',profileUrl(modulePaths[type]))}
+function closeModule(updateRoute=true){$('#moduleModal').classList.remove('open');$('#moduleModal').setAttribute('aria-hidden','true');document.body.style.overflow='';document.querySelectorAll('#moduleNav button').forEach(x=>x.classList.remove('active'));if(updateRoute)history.pushState({},'',profileUrl())}
 function applyProfile(data) {
   const p=data.profile; currentPlayer=p.username;currentProfile=p;
   document.title=`Skyfolio - ${p.username}`;
@@ -158,8 +162,8 @@ function applyProfile(data) {
   currentStorage=p.storage||{inventory:[],enderChest:[],personalVault:[],backpacks:[],bags:[],sacks:[]};
   const storedItems=[...currentStorage.inventory,...currentStorage.enderChest,...currentStorage.personalVault,...currentStorage.backpacks.flatMap(x=>x.items),...currentStorage.bags.flatMap(x=>x.items)].filter(Boolean).length;
   $('#storageSummary').textContent=`${storedItems} occupied slots · ${currentStorage.backpacks.length} backpacks · ${currentStorage.sacks?.length||0} sack resources`;
-  const routedTab=pathTabs[location.pathname];if(routedTab)openWardrobe(routedTab,false);
-  const routedModule=pathModules[location.pathname];if(routedModule)openModule(routedModule,false);
+  const route=readRoute();if(route.tab)openWardrobe(route.tab,false);
+  if(route.module)openModule(route.module,false);
   const collections=p.collections||{percent:0,maxed:0,total:0,tiersCompleted:0,totalTiers:0};
   $('#collectionPercent').textContent=`${collections.percent}%`;
   $('#collectionBar').style.width=`${collections.percent}%`;
@@ -169,23 +173,28 @@ function applyProfile(data) {
   select.innerHTML=data.profiles.map(x=>`<option value="${x.id}" ${x.id===p.id?'selected':''}>${escapeHtml(x.cuteName)}${x.selected?' · active':''}</option>`).join('');
   select.disabled=false;
   initViewer(p.username);
+  document.querySelector('.brand').href=profileUrl();
 }
 
+let lastLoad={name:'gffx',profileId:'',force:false},loadSequence=0;
+function setProfileState(mode,title,copy=''){const state=$('#profileState'),retry=$('#profileRetry');document.body.classList.toggle('profile-loading',mode==='loading');document.body.classList.toggle('profile-loaded',mode==='success');state.classList.toggle('error',mode==='error');state.hidden=mode==='success';retry.hidden=mode!=='error';$('#profileStateTitle').textContent=title;$('#profileStateCopy').textContent=copy}
 async function loadProfile(name, profileId='', force=false) {
-  const input=$('#playerInput'); input.disabled=true;
+  const input=$('#playerInput'),sequence=++loadSequence; input.disabled=true;lastLoad={name,profileId,force};
+  setProfileState('loading',`Loading ${name}`,force?'Refreshing live Hypixel data…':'Fetching profile, inventories, collections, and equipment…');
   showToast(`Loading ${name} from Hypixel…`);
   try {
     const params=new URLSearchParams();if(profileId)params.set('profile',profileId);if(force)params.set('refresh','1');const query=params.size?`?${params}`:'';
     const response=await fetch(`/api/profile/${encodeURIComponent(name)}${query}`);
     const data=await response.json();
     if(!response.ok) throw new Error(data.error || 'Could not load this profile.');
-    applyProfile(data); showToast(`Loaded ${data.profile.username} · ${data.profile.cuteName}`);
-  } catch(error) { showToast(error.message); }
-  finally { input.disabled=false;$('#refreshBtn').classList.remove('loading'); }
+    if(sequence!==loadSequence)return;normalizeRoute(data.profile.username);applyProfile(data);setProfileState('success','Profile loaded');showToast(`Loaded ${data.profile.username} · ${data.profile.cuteName}`);
+  } catch(error) {if(sequence===loadSequence){setProfileState('error',`Couldn’t load ${name}`,error.message);showToast(error.message)}}
+  finally {if(sequence===loadSequence){input.disabled=false;$('#refreshBtn').classList.remove('loading')}}
 }
 function updateFreshness(){if(!profileMeta)return;const age=Math.max(0,Date.now()-profileMeta.fetchedAt),left=Math.max(0,profileMeta.expiresAt-Date.now()),el=$('#freshness');el.textContent=`Updated ${relativeTime(profileMeta.fetchedAt)} ago · cache ${Math.ceil(left/1000)}s`;el.classList.toggle('fresh',age<60000)}
 
-$('#searchForm').addEventListener('submit', e => { e.preventDefault(); const name=$('#playerInput').value.trim(); if(name)loadProfile(name); });
+$('#searchForm').addEventListener('submit', e => { e.preventDefault(); const name=$('#playerInput').value.trim(); if(name){history.pushState({player:name},'',`/${encodeURIComponent(name)}`);loadProfile(name)} });
+$('#profileRetry').addEventListener('click',()=>loadProfile(lastLoad.name,lastLoad.profileId,true));
 $('#profileSelect').addEventListener('change', e=>{if(currentPlayer)loadProfile(currentPlayer,e.target.value)});
 $('#refreshBtn').addEventListener('click',()=>{if(!currentPlayer)return;$('#refreshBtn').classList.add('loading');loadProfile(currentPlayer,$('#profileSelect').value,true)});
 $('#equipmentCard').addEventListener('click',()=>openWardrobe('armorSets'));
@@ -206,8 +215,8 @@ document.addEventListener('pointerover',e=>{const slot=e.target.closest('.invent
 document.addEventListener('pointerout',e=>{const slot=e.target.closest('.inventory-slot,.set-item');if(slot&&!slot.contains(e.relatedTarget))hideFloatingTooltip()});
 document.addEventListener('scroll',placeFloatingTooltip,true);
 window.addEventListener('resize',placeFloatingTooltip);
-window.addEventListener('popstate',()=>{const tab=pathTabs[location.pathname],module=pathModules[location.pathname];if(tab){closeModule(false);openWardrobe(tab,false)}else if(module){openModule(module,false)}else{closeWardrobe(false);closeModule(false)}});
-$('#shareBtn').addEventListener('click', async()=>{if(!currentPlayer)return; const url=`${location.origin}${location.pathname}?player=${encodeURIComponent(currentPlayer)}`; await navigator.clipboard.writeText(url); showToast('Profile link copied');});
+window.addEventListener('popstate',()=>{const route=readRoute();if(route.player&&route.player.toLowerCase()!==currentPlayer.toLowerCase()){ $('#playerInput').value=route.player;loadProfile(route.player);return}if(route.tab){closeModule(false);openWardrobe(route.tab,false)}else if(route.module){closeWardrobe(false);openModule(route.module,false)}else{closeWardrobe(false);closeModule(false)}});
+$('#shareBtn').addEventListener('click', async()=>{if(!currentPlayer)return;normalizeRoute(currentPlayer);try{await navigator.clipboard.writeText(location.href);showToast('Profile link copied')}catch{showToast('Copy the current URL to share this page')}});
 $('#rotateBtn').addEventListener('click', e=>{viewer.autoRotate=!viewer.autoRotate;e.currentTarget.classList.toggle('active',viewer.autoRotate)});
 $('#resetBtn').addEventListener('click', ()=>{viewer.resetCameraPose();viewer.zoom=.82});
 function showToast(text){const t=$('#toast');t.textContent=text;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800)}
@@ -219,5 +228,5 @@ $('#moduleContent').addEventListener('click',e=>{const category=e.target.closest
 $('#moduleContent').addEventListener('click',e=>{const row=e.target.closest('[data-forge-toggle]');if(!row)return;const children=row.nextElementSibling,expanded=row.getAttribute('aria-expanded')==='true';row.setAttribute('aria-expanded',String(!expanded));row.querySelector('.forge-tree-guide').textContent=expanded?'▸':'▾';if(children)children.hidden=expanded});
 $('#moduleContent').addEventListener('keydown',e=>{if(!['Enter',' '].includes(e.key)||!e.target.matches('[data-forge-toggle]'))return;e.preventDefault();e.target.click()});
 renderGoals(); renderSkills(); renderEquipment(); renderActivity();
-const sharedPlayer=new URLSearchParams(location.search).get('player')||'gffx';
+const sharedPlayer=readRoute().player||'gffx';
 $('#playerInput').value=sharedPlayer;loadProfile(sharedPlayer);
