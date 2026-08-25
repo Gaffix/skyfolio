@@ -20,8 +20,9 @@ body {
 }
 
 .mini-avatar {
-  background: #1a0d10;
-  border-color: #5b202a;
+  background: transparent;
+  border: 0;
+  padding: 0;
 }
 
 .status-dot {
@@ -54,7 +55,11 @@ body {
 }
 
 .stage-glow {
-  background: rgba(255, 35, 69, 0.18);
+  width: 300px;
+  height: 460px;
+  left: calc(50% - 150px);
+  background: rgba(255, 35, 69, 0.32);
+  filter: blur(64px);
 }
 
 .stage-grid {

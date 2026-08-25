@@ -2,7 +2,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const { publicRoot, profileCacheMs: CACHE_MS, hypixelApiKey } = require('./config');
+const { publicRoot, textureCacheRoot, profileCacheMs: CACHE_MS, hypixelApiKey } = require('./config');
 const { readGoals, writeGoals, readNotebook, writeNotebook, readIronpath, writeIronpath } = require('./data-store');
 const { cleanName, titleCase, readEquipment, readLoadouts, readStorage, accessoryStats } = require('./items');
 const { recipes: forgeRecipes, recipeById, itemName } = require('./forge-recipes');
@@ -102,7 +102,7 @@ function shapeProfile(profile, uuid, username, count, collectionResources, garde
 
 async function getSkin(username){const player=await resolvePlayer(username);const sessionRes=await fetch(`https://sessionserver.mojang.com/session/minecraft/profile/${player.id}`);if(!sessionRes.ok)throw Object.assign(new Error('Skin profile unavailable.'),{status:502});const session=await sessionRes.json();const texture=session.properties?.find(x=>x.name==='textures');const skinUrl=texture&&JSON.parse(Buffer.from(texture.value,'base64').toString('utf8')).textures?.SKIN?.url;if(!skinUrl||new URL(skinUrl).hostname!=='textures.minecraft.net')throw Object.assign(new Error('This player has no custom skin.'),{status:404});const image=await fetch(skinUrl);if(!image.ok)throw Object.assign(new Error('Skin image unavailable.'),{status:502});return Buffer.from(await image.arrayBuffer())}
 async function getAvatar(username){const player=await resolvePlayer(username);const image=await fetch(`https://mc-heads.net/avatar/${player.id}/72`);if(!image.ok)throw Object.assign(new Error('Player head unavailable.'),{status:502});return Buffer.from(await image.arrayBuffer())}
-async function getItemTexture(id){if(itemTextureCache.has(id))return itemTextureCache.get(id);let response;try{response=await fetchWithRetry(`https://sky.shiiyu.moe/api/item/${encodeURIComponent(id)}`,{},2)}catch{}if(!response?.ok)response=await fetch('https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.21.4/assets/minecraft/textures/item/paper.png');const image=Buffer.from(await response.arrayBuffer());itemTextureCache.set(id,image);return image}
+async function getItemTexture(id){if(itemTextureCache.has(id))return itemTextureCache.get(id);const file=path.join(textureCacheRoot,`${encodeURIComponent(id)}.png`);const pending=(async()=>{try{return fs.readFileSync(file)}catch{}let response;try{response=await fetchWithRetry(`https://sky.shiiyu.moe/api/item/${encodeURIComponent(id)}`,{},1)}catch{}if(!response?.ok)response=await fetch('https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.21.4/assets/minecraft/textures/item/paper.png',{signal:AbortSignal.timeout(3500)});const image=Buffer.from(await response.arrayBuffer());try{fs.mkdirSync(textureCacheRoot,{recursive:true});fs.writeFileSync(file,image)}catch{}return image})();itemTextureCache.set(id,pending);try{return await pending}catch(error){itemTextureCache.delete(id);throw error}}
 
 async function getProfile(username, requestedId, force=false) {
   if (!hypixelApiKey) throw Object.assign(new Error('Missing HYPIXEL_API_KEY. Add it to the .env file and restart the server.'), { status: 503 });
