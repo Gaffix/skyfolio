@@ -104,14 +104,16 @@ function ironpathStats(member,storage,loadouts,equipment){
   return{counts,recipes:forgeRecipes.map(recipe=>({...recipe,icon:icon(recipe.id),ingredients:Object.entries(recipe.ingredients).map(([id,count])=>({id,name:itemName(id),count,icon:icon(id)}))})),processes,hotm:Number(core.nodes?.special_0||core.tier||0),sacksAvailable:Object.prototype.hasOwnProperty.call(member.inventory||{},'sacks_counts')||Object.prototype.hasOwnProperty.call(member,'sacks_counts')};
 }
 function profileIdentity(profile,member,playerData,identity){
-  const rawRank=playerData.prefix||playerData.monthlyPackageRank||playerData.newPackageRank||playerData.rank||playerData.packageRank||'PLAYER',rank=['NONE','NORMAL'].includes(rawRank)?'PLAYER':rawRank;
+  const rankValues=[playerData.monthlyPackageRank,playerData.newPackageRank,playerData.packageRank,playerData.rank].filter(value=>value&&!['NONE','NORMAL'].includes(value));
+  const rawRank=playerData.prefix||rankValues[0]||'PLAYER',rankLabels={MVP_PLUS:'MVP+',MVP_PLUS_PLUS:'MVP++',SUPERSTAR:'MVP++',MVP:'MVP',VIP_PLUS:'VIP+',VIP:'VIP',YOUTUBER:'YOUTUBE'};
+  const rankKey=String(rawRank).replace(/§[0-9a-fk-or]/gi,'').replace(/\[[^\]]+\]/g,'').trim(),rank=rankLabels[rankKey]||rankKey.replaceAll('_',' ');
   const warnings=[];
   if(!member.inventory?.inv_contents)warnings.push('Inventory API data is unavailable.');
   if(!profile.banking)warnings.push('Banking API data is unavailable.');
   if(!member.inventory?.bag_contents)warnings.push('Bag contents are unavailable.');
   if(!member.player_data?.experience&&!member.experience_skill_combat)warnings.push('Skill experience is unavailable.');
   const mode=profile.game_mode||'normal';
-  return{rank:String(rank).replace(/\[[^\]]+\]/g,'').replaceAll('_',' '),prefix:playerData.prefix||null,gameMode:mode,socials:playerData.socialMedia?.links||{},guild:identity?.guild||null,coop:identity?.members||[],created:Number(member.profile?.first_join||member.first_join||0),lastSave:Number(member.profile?.last_save||member.last_save||0),lastLogin:Number(playerData.lastLogin||0),warnings};
+  return{rank,rankColor:playerData.monthlyRankColor||playerData.rankPlusColor||null,prefix:playerData.prefix||null,gameMode:mode,socials:playerData.socialMedia?.links||{},guild:identity?.guild||null,coop:identity?.members||[],created:Number(member.profile?.first_join||member.first_join||0),lastSave:Number(member.profile?.last_save||member.last_save||0),lastLogin:Number(playerData.lastLogin||0),warnings};
 }
 function shapeProfile(profile, uuid, username, count, collectionResources, bestiaryResources, accessoryParents, garden, bazaar, lowestBin, election, museum, playerData, identityData) {
   const member = memberOf(profile, uuid) || {};
