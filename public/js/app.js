@@ -200,7 +200,7 @@ async function loadProfile(name, profileId='', force=false) {
   } catch(error) {if(sequence===loadSequence){setProfileState('error',`Couldn’t load ${name}`,error.message);showToast(error.message)}}
   finally {if(sequence===loadSequence){input.disabled=false;$('#refreshBtn').classList.remove('loading')}}
 }
-function updateFreshness(){if(!profileMeta)return;const age=Math.max(0,Date.now()-profileMeta.fetchedAt),left=Math.max(0,profileMeta.expiresAt-Date.now()),el=$('#freshness');el.textContent=`Updated ${relativeTime(profileMeta.fetchedAt)} ago · cache ${Math.ceil(left/1000)}s`;el.classList.toggle('fresh',age<60000)}
+function updateFreshness(){if(!profileMeta)return;const age=Math.max(0,Date.now()-profileMeta.fetchedAt),left=Math.max(0,profileMeta.expiresAt-Date.now()),el=$('#freshness'),updated=age<60000?'Updated now':`Updated ${relativeTime(profileMeta.fetchedAt)} ago`;el.textContent=`${updated} · cache ${Math.ceil(left/1000)}s`;el.classList.toggle('fresh',age<60000)}
 
 $('#searchForm').addEventListener('submit', e => { e.preventDefault(); const name=$('#playerInput').value.trim(); if(name){history.pushState({player:name},'',`/${encodeURIComponent(name)}`);loadProfile(name)} });
 $('#profileRetry').addEventListener('click',()=>loadProfile(lastLoad.name,lastLoad.profileId,true));
