@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "node src/server.js",
-    "check": "node --check src/server.js && node --check src/app.js && node --check src/config.js && node --check src/data-store.js && node --check src/items.js && node --check src/forge-recipes.js && node --check scripts/update-forge-recipes.js && node --check public/js/app.js && node --check public/js/profile-depth.js && node --check public/js/profile-progress.js && node --check public/js/world-depth.js"
+    "check": "node --check src/server.js && node --check src/app.js && node --check src/config.js && node --check src/data-store.js && node --check src/items.js && node --check src/forge-recipes.js && node --check scripts/update-forge-recipes.js && node --check public/js/app.js && node --check public/js/profile-depth.js && node --check public/js/profile-progress.js && node --check public/js/world-depth.js && node --check public/js/customization.js"
   },
   "engines": { "node": ">=18.0.0-0" }
 }

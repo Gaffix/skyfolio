@@ -17,6 +17,7 @@ const gardenCache=new Map();
 const museumCache=new Map();
 const itemTextureCache=new Map();
 const minionRecipeCache=new Map();
+const identityCache=new Map();
 
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function fetchWithRetry(url,options={},attempts=2){let lastError,lastResponse;for(let attempt=0;attempt<attempts;attempt++){try{const response=await fetch(url,{...options,signal:AbortSignal.timeout(8000)});lastResponse=response;if(response.status!==429&&response.status<500)return response}catch(error){lastError=error}if(attempt+1<attempts)await wait(250*(attempt+1))}if(lastResponse)return lastResponse;const host=new URL(url).hostname;throw Object.assign(new Error(`Could not reach ${host}. Check your connection and try again.`),{status:502,cause:lastError})}
@@ -32,6 +33,7 @@ async function getGarden(profileId){const cached=gardenCache.get(profileId);if(c
 async function getMuseum(profileId){const cached=museumCache.get(profileId);if(cached&&Date.now()-cached.time<10*60*1000)return cached.data;try{const response=await fetch(`https://api.hypixel.net/v2/skyblock/museum?profile=${profileId}`,{headers:{'API-Key':hypixelApiKey}}),body=await response.json(),data=body.members||{};museumCache.set(profileId,{time:Date.now(),data});return data}catch{return{}}}
 async function readJsonBody(req){let body='';for await(const chunk of req){body+=chunk;if(body.length>65536)throw Object.assign(new Error('Request is too large.'),{status:413})}try{return JSON.parse(body||'{}')}catch{throw Object.assign(new Error('Invalid JSON.'),{status:400})}}
 async function getMinionRecipe(id){if(minionRecipeCache.has(id))return minionRecipeCache.get(id);const pending=(async()=>{const response=await fetchWithRetry(`https://raw.githubusercontent.com/NotEnoughUpdates/NotEnoughUpdates-REPO/master/items/${encodeURIComponent(id)}.json`,{},2);if(!response.ok)throw Object.assign(new Error('Recipe unavailable.'),{status:404});const data=await response.json(),grid=Object.entries(data.recipe||{}).map(([slot,value])=>{const[index,count]=String(value).split(':');return{slot,id:index,count:Number(count||1),name:titleCase(index),icon:`/api/item-texture/${encodeURIComponent(index)}?v=3`}}),totals={};for(const item of grid)totals[item.id]=(totals[item.id]||0)+item.count;return{id,name:String(data.displayname||titleCase(id)).replace(/§[0-9a-fk-or]/gi,''),grid,ingredients:Object.entries(totals).map(([itemId,count])=>({id:itemId,name:titleCase(itemId),count,icon:`/api/item-texture/${encodeURIComponent(itemId)}?v=3`}))}})();minionRecipeCache.set(id,pending);try{return await pending}catch(error){minionRecipeCache.delete(id);throw error}}
+async function getIdentityData(profile,uuid){const key=`${profile.profile_id}:${uuid}`,cached=identityCache.get(key);if(cached&&Date.now()-cached.time<30*60*1000)return cached.data;const members=await Promise.all(Object.entries(profile.members||{}).map(async([id,member])=>{let username=id.slice(0,8);try{const response=await fetchWithRetry(`https://sessionserver.mojang.com/session/minecraft/profile/${id.replaceAll('-','')}`,{},1);if(response.ok)username=(await response.json()).name||username}catch{}return{uuid:id.replaceAll('-',''),username,removed:Boolean(member.deletion_notice?.timestamp),joined:Number(member.profile?.first_join||0),head:`/api/avatar/${encodeURIComponent(username)}`}}));let guild=null;try{const response=await fetchWithRetry(`https://api.hypixel.net/v2/guild?player=${uuid}`,{headers:{'API-Key':hypixelApiKey}},1);if(response.ok){const body=await response.json(),g=body.guild;if(g){const guildMember=(g.members||[]).find(x=>String(x.uuid).replaceAll('-','')===uuid.replaceAll('-',''));guild={name:g.name,tag:g.tag||null,rank:guildMember?.rank||null,created:Number(g.created||0),members:(g.members||[]).length}}}}catch{}const data={members,guild};identityCache.set(key,{time:Date.now(),data});return data}
 
 const skillXp = [50,125,200,300,500,750,1000,1500,2000,3500,5000,7500,10000,15000,20000,30000,50000,75000,100000,200000,300000,400000,500000,600000,700000,800000,900000,1000000,1100000,1200000,1300000,1400000,1500000,1600000,1700000,1800000,1900000,2000000,2100000,2200000,2300000,2400000,2500000,2600000,2750000,2900000,3100000,3400000,3700000,4000000,4300000,4600000,4900000,5200000,5500000,5800000,6100000,6400000,6700000,7000000];
 const dungeonXp = [50,75,110,160,230,330,470,670,950,1340,1890,2665,3760,5260,7380,10300,14400,20000,27600,38000,52500,71500,97000,132000,180000,243000,328000,445000,600000,800000,1065000,1410000,1900000,2500000,3300000,4300000,5600000,7200000,9200000,12000000,15000000,19000000,24000000,30000000,38000000,48000000,60000000,75000000,93000000,116250000];
@@ -101,7 +103,17 @@ function ironpathStats(member,storage,loadouts,equipment){
   const icon=id=>`/api/item-texture/${encodeURIComponent(id)}`;
   return{counts,recipes:forgeRecipes.map(recipe=>({...recipe,icon:icon(recipe.id),ingredients:Object.entries(recipe.ingredients).map(([id,count])=>({id,name:itemName(id),count,icon:icon(id)}))})),processes,hotm:Number(core.nodes?.special_0||core.tier||0),sacksAvailable:Object.prototype.hasOwnProperty.call(member.inventory||{},'sacks_counts')||Object.prototype.hasOwnProperty.call(member,'sacks_counts')};
 }
-function shapeProfile(profile, uuid, username, count, collectionResources, bestiaryResources, accessoryParents, garden, bazaar, lowestBin, election, museum, playerData) {
+function profileIdentity(profile,member,playerData,identity){
+  const rawRank=playerData.prefix||playerData.monthlyPackageRank||playerData.newPackageRank||playerData.rank||playerData.packageRank||'PLAYER',rank=['NONE','NORMAL'].includes(rawRank)?'PLAYER':rawRank;
+  const warnings=[];
+  if(!member.inventory?.inv_contents)warnings.push('Inventory API data is unavailable.');
+  if(!profile.banking)warnings.push('Banking API data is unavailable.');
+  if(!member.inventory?.bag_contents)warnings.push('Bag contents are unavailable.');
+  if(!member.player_data?.experience&&!member.experience_skill_combat)warnings.push('Skill experience is unavailable.');
+  const mode=profile.game_mode||'normal';
+  return{rank:String(rank).replace(/\[[^\]]+\]/g,'').replaceAll('_',' '),prefix:playerData.prefix||null,gameMode:mode,socials:playerData.socialMedia?.links||{},guild:identity?.guild||null,coop:identity?.members||[],created:Number(member.profile?.first_join||member.first_join||0),lastSave:Number(member.profile?.last_save||member.last_save||0),lastLogin:Number(playerData.lastLogin||0),warnings};
+}
+function shapeProfile(profile, uuid, username, count, collectionResources, bestiaryResources, accessoryParents, garden, bazaar, lowestBin, election, museum, playerData, identityData) {
   const member = memberOf(profile, uuid) || {};
   const skillNames = ['combat','farming','mining','foraging','fishing','enchanting','alchemy','taming'];
   const skills = {};
@@ -126,7 +138,7 @@ function shapeProfile(profile, uuid, username, count, collectionResources, besti
     skyblockLevel: levelXp / 100,
     skillAverage: availableSkills.length ? availableSkills.reduce((a,b)=>a+b,0) / availableSkills.length : 0,
     catacombs: levelFromXp(cataXp, dungeonXp), slayerXp, skills, equipment, loadouts, storage, collections: collectionProgress(member,collectionResources), activity: recentActivity(member),
-    slayers:slayerStats(member),dungeonDetails:dungeonStats(member),skillDetails:detailedSkills(member,garden,equipment,loadouts),pets,petScore:petScore(pets),mining:miningStats(member),garden:gardenStats(member,garden),minions:minionStats(profile),crimson:crimsonStats(member),rift:riftStats(member),misc:miscStats(member),miscDeep:miscDeepStats(profile,member,playerData),bestiary:bestiaryStats(member,bestiaryResources),networth:networthStats(profile,member,storage,loadouts,bazaar,lowestBin,pets),accessories:accessoryStats(member,storage,accessoryParents),essence:essenceStats(member),museum:museumStats(museum,uuid),mayor:election,ironpath:ironpathStats(member,storage,loadouts,equipment)
+    identity:profileIdentity(profile,member,playerData,identityData),slayers:slayerStats(member),dungeonDetails:dungeonStats(member),skillDetails:detailedSkills(member,garden,equipment,loadouts),pets,petScore:petScore(pets),mining:miningStats(member),garden:gardenStats(member,garden),minions:minionStats(profile),crimson:crimsonStats(member),rift:riftStats(member),misc:miscStats(member),miscDeep:miscDeepStats(profile,member,playerData),bestiary:bestiaryStats(member,bestiaryResources),networth:networthStats(profile,member,storage,loadouts,bazaar,lowestBin,pets),accessories:accessoryStats(member,storage,accessoryParents),essence:essenceStats(member),museum:museumStats(museum,uuid),mayor:election,ironpath:ironpathStats(member,storage,loadouts,equipment)
   };
 }
 
@@ -147,8 +159,8 @@ async function getProfile(username, requestedId, force=false) {
   }
   if (!raw.profiles.length) throw Object.assign(new Error('This player has no SkyBlock profiles.'), { status: 404 });
   const chosen = raw.profiles.find(p => p.profile_id === requestedId) || raw.profiles.find(p => p.selected) || raw.profiles[0];
-  const [resources,bestiary,parents,garden,bazaar,lowestBin,election,museum]=await Promise.all([getCollectionResources(),getBestiaryResources(),getAccessoryParents(),getGarden(chosen.profile_id),getBazaarResources(),getLowestBinResources(),getElectionResources(),getMuseum(chosen.profile_id)]);
-  return { profile: shapeProfile(chosen, raw.player.id, raw.player.name, raw.profiles.length, resources,bestiary,parents,garden,bazaar,lowestBin,election,museum,raw.playerData||{}), profiles: raw.profiles.map(p => ({ id:p.profile_id, cuteName:p.cute_name || 'Unnamed', selected:Boolean(p.selected) })),meta:{fetchedAt:raw.time,expiresAt:raw.time+CACHE_MS,rateLimit:raw.rateLimit||{}} };
+  const [resources,bestiary,parents,garden,bazaar,lowestBin,election,museum,identity]=await Promise.all([getCollectionResources(),getBestiaryResources(),getAccessoryParents(),getGarden(chosen.profile_id),getBazaarResources(),getLowestBinResources(),getElectionResources(),getMuseum(chosen.profile_id),getIdentityData(chosen,raw.player.id)]);
+  return { profile: shapeProfile(chosen, raw.player.id, raw.player.name, raw.profiles.length, resources,bestiary,parents,garden,bazaar,lowestBin,election,museum,raw.playerData||{},identity), profiles: raw.profiles.map(p => ({ id:p.profile_id, cuteName:p.cute_name || 'Unnamed', selected:Boolean(p.selected) })),meta:{fetchedAt:raw.time,expiresAt:raw.time+CACHE_MS,rateLimit:raw.rateLimit||{}} };
 }
 
 const types = { '.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json','.png':'image/png','.svg':'image/svg+xml' };
