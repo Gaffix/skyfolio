@@ -20,7 +20,7 @@ const modulePaths={ironpath:'/ironpath',skills:'/skills',slayer:'/slayer',dungeo
 const pathModules=Object.fromEntries(Object.entries(modulePaths).map(([key,path])=>[path,key]));
 const knownPages=new Set([...Object.values(tabPaths),...Object.values(modulePaths)]);
 function readRoute(){const path=location.pathname.replace(/\/+$/,'')||'/',legacyTab=pathTabs[path],legacyModule=pathModules[path],queryPlayer=new URLSearchParams(location.search).get('player')||'';if(legacyTab||legacyModule)return{player:queryPlayer,tab:legacyTab,module:legacyModule,page:path};const parts=path.split('/').filter(Boolean),player=/^[A-Za-z0-9_]{1,16}$/.test(parts[0]||'')?decodeURIComponent(parts[0]):queryPlayer,page=parts[1]?`/${parts[1]}`:'';return{player,tab:pathTabs[page],module:pathModules[page],page:knownPages.has(page)?page:''}}
-function profileUrl(page=''){const player=currentPlayer||readRoute().player||'gffx';return`/${encodeURIComponent(player)}${page}`}
+function profileUrl(page=''){const player=currentPlayer||readRoute().player;return player?`/${encodeURIComponent(player)}${page}`:'/' }
 function normalizeRoute(player){const route=readRoute(),page=route.page||'';history.replaceState({player,page},'',`/${encodeURIComponent(player)}${page}`)}
 let notebookNotes=[],activeNoteId=null,notebookTimer;
 let ironpathGoals=[],ironpathKey='',ironpathTimer,ironpathCategory='all';
@@ -185,7 +185,7 @@ function applyProfile(data) {
   document.querySelector('.brand').href=profileUrl();
 }
 
-let lastLoad={name:'gffx',profileId:'',force:false},loadSequence=0;
+let lastLoad={name:'',profileId:'',force:false},loadSequence=0;
 function setProfileState(mode,title,copy=''){const state=$('#profileState'),retry=$('#profileRetry');document.body.classList.toggle('profile-loading',mode==='loading');document.body.classList.toggle('profile-loaded',mode==='success');state.classList.toggle('error',mode==='error');state.hidden=mode==='success';retry.hidden=mode!=='error';$('#profileStateTitle').textContent=title;$('#profileStateCopy').textContent=copy}
 async function loadProfile(name, profileId='', force=false) {
   const input=$('#playerInput'),sequence=++loadSequence; input.disabled=true;lastLoad={name,profileId,force};
@@ -227,7 +227,7 @@ document.addEventListener('pointerover',e=>{const slot=e.target.closest('.invent
 document.addEventListener('pointerout',e=>{const slot=e.target.closest('.inventory-slot,.set-item');if(slot&&!slot.contains(e.relatedTarget))hideFloatingTooltip()});
 document.addEventListener('scroll',placeFloatingTooltip,true);
 window.addEventListener('resize',placeFloatingTooltip);
-window.addEventListener('popstate',()=>{const route=readRoute();if(route.player&&route.player.toLowerCase()!==currentPlayer.toLowerCase()){ $('#playerInput').value=route.player;loadProfile(route.player);return}if(route.tab){closeModule(false);openWardrobe(route.tab,false)}else if(route.module){closeWardrobe(false);openModule(route.module,false)}else{closeWardrobe(false);closeModule(false)}});
+window.addEventListener('popstate',()=>{const route=readRoute();if(route.player&&route.player.toLowerCase()!==(currentPlayer||'').toLowerCase()){ $('#playerInput').value=route.player;loadProfile(route.player);return}if(route.tab){closeModule(false);openWardrobe(route.tab,false)}else if(route.module){closeWardrobe(false);openModule(route.module,false)}else{closeWardrobe(false);closeModule(false)}});
 $('#shareBtn').addEventListener('click', async()=>{if(!currentPlayer)return;normalizeRoute(currentPlayer);try{await navigator.clipboard.writeText(location.href);showToast('Profile link copied')}catch{showToast('Copy the current URL to share this page')}});
 $('#rotateBtn').addEventListener('click', e=>{viewer.autoRotate=!viewer.autoRotate;e.currentTarget.classList.toggle('active',viewer.autoRotate)});
 $('#resetBtn').addEventListener('click', ()=>{viewer.resetCameraPose();viewer.zoom=.82});
@@ -264,5 +264,5 @@ renderModule=function(type){if(type==='pets')return renderPetsPerfect();if(type=
 $('#moduleContent').addEventListener('input',e=>{if(e.target.id==='petSearch'){petFilter=e.target.value;drawPets()}});
 $('#moduleContent').addEventListener('change',e=>{if(e.target.id==='petRarity'){petRarity=e.target.value;drawPets()}if(e.target.id==='petSort'){petSort=e.target.value;drawPets()}});
 $('#moduleContent').addEventListener('input',e=>{if(e.target.id==='minionSearch')document.querySelectorAll('[data-minion-name]').forEach(card=>card.hidden=!card.dataset.minionName.includes(e.target.value.toLowerCase()))});
-const sharedPlayer=readRoute().player||'gffx';
-$('#playerInput').value=sharedPlayer;loadProfile(sharedPlayer);
+const sharedPlayer=readRoute().player;
+if(sharedPlayer){$('#playerInput').value=sharedPlayer;loadProfile(sharedPlayer)}
