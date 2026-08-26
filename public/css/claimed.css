@@ -1,1 +1,2 @@
 .claim-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px}.claim-grid article{display:flex;align-items:center;gap:8px;border:1px solid #33272a;background:#110f10;color:#716b6e;border-radius:9px;padding:9px}.claim-grid article.claimed{border-color:#66303c;color:#eee}.claim-grid span{color:#ef405b}
+.consumable-grid article.api-unavailable{opacity:.58}.consumable-grid article.api-unavailable span{font-size:10px;color:#b89199}
