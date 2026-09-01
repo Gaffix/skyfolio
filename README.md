@@ -79,7 +79,7 @@ For hosted deployments, configure `HYPIXEL_API_KEY` as a private environment var
 
 For Render or another uptime monitor, ping `/api/health` instead of a player URL.
 
-The Quest Board, Notebook, and IronPath goals use JSON files in `data/`. Dashboard customization, themes, favorites, and active tabs use browser `localStorage`. On hosts with ephemeral filesystems, server-side JSON data can reset during deployments or restarts unless persistent storage is attached.
+The Quest Board and Notebook use browser `localStorage`, so they survive server deployments but remain specific to the current browser and device. IronPath goals use a JSON file in `data/` and can reset on hosts with ephemeral filesystems. Dashboard customization, themes, favorites, and active tabs also use browser `localStorage`.
 
 ## Project structure
 
@@ -102,8 +102,8 @@ src/
   items.js            Minecraft NBT and SkyBlock item parsing
   forge-recipes.js    Forge recipes and durations
 scripts/              Repository maintenance scripts
-data/                 Local persistent data (ignored by Git)
-cache/                Downloaded item textures (ignored by Git)
+data/                 Local IronPath persistence (ignored by Git)
+cache/                Seeded item textures used by the image proxy
 .env.example          Safe environment-variable template
 ```
 
