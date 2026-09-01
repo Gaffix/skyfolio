@@ -62,6 +62,18 @@ No dependency installation is currently required. You can validate the server an
 npm run check
 ```
 
+### Populate the item texture cache
+
+Download every item render discoverable from the current Hypixel and NotEnoughUpdates item catalogs:
+
+```powershell
+npm run cache:textures
+```
+
+The downloader resumes by default, skipping textures already present in `cache/textures`. Run `node scripts/download-item-textures.js --force` to replace existing files, or `node scripts/download-item-textures.js --limit 20` for a small test run. Optional `--concurrency 2` and `--delay 250` arguments control request pressure. Failed item IDs are written to `cache/texture-download-failures.json` and can be retried by running the command again.
+
+SkyCrypt can protect the public endpoint with a Cloudflare browser challenge. The script detects that response and stops instead of attempting to bypass it. If you operate an authorized SkyCrypt backend, set `SKYCRYPT_ITEM_API` to its `/api/item` URL before running the command.
+
 ## Configuration and API safety
 
 The Hypixel API key is read exclusively by the Node server. It is never included in browser responses or client-side JavaScript. The `.env` file is ignored by Git, so never remove it from `.gitignore` or commit a real key.
