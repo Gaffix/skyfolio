@@ -21,13 +21,14 @@ const delayMs = Math.max(0, option('delay', 250));
 const limit = Math.max(0, option('limit', 0));
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
-async function fetchWithRetry(url, attempts = 4) {
+async function fetchWithRetry(url, attempts = 4, options = {}) {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
       const response = await fetch(url, {
         headers: { 'User-Agent': userAgent },
-        signal: AbortSignal.timeout(30000)
+        signal: AbortSignal.timeout(30000),
+        ...options
       });
       if (response.ok || response.status === 404) return response;
       const retryAfter = Number(response.headers.get('retry-after'));
@@ -39,6 +40,24 @@ async function fetchWithRetry(url, attempts = 4) {
     }
   }
   throw lastError || new Error(`Request failed: ${url}`);
+}
+
+async function fetchItemImage(url) {
+  const configuredOrigin = new URL(itemApi).origin;
+  for (let redirects = 0; redirects <= 5; redirects++) {
+    const response = await fetchWithRetry(url, 4, { redirect: 'manual' });
+    if (response.status < 300 || response.status >= 400) return response;
+    const location = response.headers.get('location');
+    if (!location) return response;
+    const next = new URL(location, url);
+    if (['localhost', '127.0.0.1'].includes(next.hostname)) {
+      const localOrigin = new URL(configuredOrigin);
+      next.protocol = localOrigin.protocol;
+      next.host = localOrigin.host;
+    }
+    url = next.href;
+  }
+  throw new Error('Too many redirects');
 }
 
 async function hypixelItemIds() {
@@ -84,7 +103,7 @@ async function download(id) {
   const file = path.join(outputRoot, `${encodeURIComponent(id)}.png`);
   if (!force && fs.existsSync(file) && fs.statSync(file).size > 0) return 'skipped';
   const url = `${itemApi}/${encodeURIComponent(id)}`;
-  const response = await fetchWithRetry(url);
+  const response = await fetchItemImage(url);
   if (response.status === 403 && response.headers.get('cf-mitigated') === 'challenge') {
     const error = new Error('SkyCrypt is protected by a Cloudflare browser challenge');
     error.blocked = true;
