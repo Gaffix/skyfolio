@@ -76,9 +76,12 @@ function initViewer(name = 'Technoblade') {
 }
 
 function renderGoals() {
-  $('#goals').innerHTML = goals.length ? goals.map(g => {const track=trackGoal(g.text);return `<div class="goal ${g.done ? 'done' : ''}" data-id="${g.id}"><input type="checkbox" ${g.done ? 'checked' : ''}><div><label>${escapeHtml(g.text)}</label>${track?`<div style="height:3px;background:#2b2426;margin-top:7px"><span style="display:block;height:100%;width:${track.percent}%;background:var(--lime)"></span></div><small style="display:block;margin-top:4px">${number.format(track.current)} / ${number.format(track.target)} · ${track.percent}%</small>`:''}</div><button aria-label="Delete">×</button></div>`}).join('') : '<div class="goal"><label>Your quest board is empty.</label></div>';
-  const done = goals.filter(g => g.done).length;
-  $('#completion').textContent = goals.length ? `${Math.round(done / goals.length * 100)}%` : '0%';
+  const active=goals.filter(g=>!g.archived),archived=goals.filter(g=>g.archived);
+  $('#goals').innerHTML = active.length ? active.map(g => {const track=trackGoal(g.text);return `<div class="goal ${g.done ? 'done' : ''}" data-id="${g.id}"><input type="checkbox" ${g.done ? 'checked' : ''}><div class="goal-copy"><label>${escapeHtml(g.text)}</label>${track?`<div style="height:3px;background:#2b2426;margin-top:7px"><span style="display:block;height:100%;width:${track.percent}%;background:var(--lime)"></span></div><small style="display:block;margin-top:4px">${number.format(track.current)} / ${number.format(track.target)} · ${track.percent}%</small>`:''}</div><button data-goal-action="delete" aria-label="Delete">×</button></div>`}).join('') : '<div class="goal goal-empty"><label>Your quest board is empty.</label></div>';
+  $('#archivedGoals').innerHTML=archived.length?`<details class="goal-archive"><summary>Archived goals <span>${archived.length}</span></summary><div>${archived.map(g=>`<div class="archived-goal" data-id="${g.id}"><span>${escapeHtml(g.text)}</span><button data-goal-action="restore">Restore</button><button data-goal-action="delete" aria-label="Delete archived goal">×</button></div>`).join('')}</div></details>`:'';
+  const done = active.filter(g => g.done).length;
+  $('#completion').textContent = active.length ? `${Math.round(done / active.length * 100)}%` : '0%';
+  $('#clearComplete').hidden=!done;
   if(currentPlayer)writeLocalList(personalStorageKey('goals'),goals);
 }
 function syncGoals(player){const key=personalStorageKey('goals',player),hasPlayerData=localStorage.getItem(key)!==null,migrateLegacy=!hasPlayerData&&legacyGoalsAvailable&&!isSampleGoals(browserGoals);goals=hasPlayerData?readLocalList(key):(migrateLegacy?browserGoals:[]);writeLocalList(key,goals);if(legacyGoalsAvailable){localStorage.removeItem('skyfolio-goals');legacyGoalsAvailable=false}renderGoals()}
@@ -87,8 +90,9 @@ function escapeHtml(s){const d=document.createElement('div');d.textContent=s;ret
 
 $('#goalForm').addEventListener('submit', e => { e.preventDefault(); const input=$('#goalInput'); const text=input.value.trim(); if(!text)return; goals.unshift({id:Date.now(),text,done:false}); input.value=''; renderGoals(); });
 $('#goals').addEventListener('change', e => { const row=e.target.closest('.goal'); if(!row)return; const goal=goals.find(g=>g.id===Number(row.dataset.id)); if(goal)goal.done=e.target.checked; renderGoals(); });
-$('#goals').addEventListener('click', e => { if(e.target.tagName!=='BUTTON')return; const row=e.target.closest('.goal'); goals=goals.filter(g=>g.id!==Number(row.dataset.id)); renderGoals(); });
-$('#clearComplete').addEventListener('click', () => { goals=goals.filter(g=>!g.done); renderGoals(); });
+$('#goals').addEventListener('click', e => { if(e.target.dataset.goalAction!=='delete')return; const row=e.target.closest('.goal'); goals=goals.filter(g=>g.id!==Number(row.dataset.id)); renderGoals(); });
+$('#archivedGoals').addEventListener('click',e=>{const action=e.target.dataset.goalAction;if(!action)return;const row=e.target.closest('.archived-goal'),goal=goals.find(g=>g.id===Number(row.dataset.id));if(action==='restore'&&goal){goal.archived=false;goal.done=false}else if(action==='delete')goals=goals.filter(g=>g.id!==Number(row.dataset.id));renderGoals()});
+$('#clearComplete').addEventListener('click', () => { const archivedAt=Date.now(); goals.forEach(g=>{if(g.done&&!g.archived){g.archived=true;g.archivedAt=archivedAt}}); renderGoals(); });
 
 function renderEquipment(items=[]) {
   const slots={Armor:['Helmet','Chestplate','Leggings','Boots'],Equipment:['Necklace','Cloak','Belt','Gloves']};
