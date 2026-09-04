@@ -73,7 +73,11 @@ function initViewer(name = 'Technoblade') {
   viewer.zoom = 0.82;
   viewer.fov = 52;
   viewer.controls.enablePan = false;
+  frameViewer();
 }
+
+let viewerMobileFramed=false;
+function frameViewer(){if(!viewer)return;const canvas=$('#skinCanvas'),mobile=matchMedia('(max-width:760px)').matches;viewer.setSize(canvas.clientWidth,canvas.clientHeight);if(mobile){viewer.camera.position.set(0,16,46);viewer.controls.target.set(0,16,0);viewer.zoom=.72;viewer.controls.update();viewerMobileFramed=true}else if(viewerMobileFramed){viewer.resetCameraPose();viewer.zoom=.82;viewerMobileFramed=false}}
 
 function renderGoals() {
   const active=goals.filter(g=>!g.archived),archived=goals.filter(g=>g.archived);
@@ -239,9 +243,9 @@ window.addEventListener('resize',placeFloatingTooltip);
 window.addEventListener('popstate',()=>{const route=readRoute();if(route.player&&route.player.toLowerCase()!==(currentPlayer||'').toLowerCase()){ $('#playerInput').value=route.player;loadProfile(route.player);return}if(route.tab){closeModule(false);openWardrobe(route.tab,false)}else if(route.module){closeWardrobe(false);openModule(route.module,false)}else{closeWardrobe(false);closeModule(false)}});
 $('#shareBtn').addEventListener('click', async()=>{if(!currentPlayer)return;normalizeRoute(currentPlayer);try{await navigator.clipboard.writeText(location.href);showToast('Profile link copied')}catch{showToast('Copy the current URL to share this page')}});
 $('#rotateBtn').addEventListener('click', e=>{viewer.autoRotate=!viewer.autoRotate;e.currentTarget.classList.toggle('active',viewer.autoRotate)});
-$('#resetBtn').addEventListener('click', ()=>{viewer.resetCameraPose();viewer.zoom=.82});
+$('#resetBtn').addEventListener('click', ()=>{viewer.resetCameraPose();viewer.zoom=.82;viewerMobileFramed=false;frameViewer()});
 function showToast(text){const t=$('#toast');t.textContent=text;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2800)}
-window.addEventListener('resize',()=>{if(viewer)viewer.setSize($('#skinCanvas').clientWidth,$('#skinCanvas').clientHeight)});
+window.addEventListener('resize',frameViewer);
 const ironpathPlanLegacy=ironpathPlan;
 ironpathPlan=ironpathPlanWithExcess;
 drawIronpath=drawIronpathOrganized;
