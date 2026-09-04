@@ -77,7 +77,7 @@ function initViewer(name = 'Technoblade') {
 }
 
 let viewerMobileFramed=false;
-function frameViewer(){if(!viewer)return;const canvas=$('#skinCanvas'),mobile=matchMedia('(max-width:760px)').matches;viewer.setSize(canvas.clientWidth,canvas.clientHeight);if(mobile){viewer.camera.position.set(0,16,46);viewer.controls.target.set(0,16,0);viewer.zoom=.72;viewer.controls.update();viewerMobileFramed=true}else if(viewerMobileFramed){viewer.resetCameraPose();viewer.zoom=.82;viewerMobileFramed=false}}
+function frameViewer(){if(!viewer)return;const canvas=$('#skinCanvas'),mobile=matchMedia('(max-width:760px)').matches;viewer.setSize(canvas.clientWidth,canvas.clientHeight);if(mobile){viewer.camera.position.set(0,14,46);viewer.controls.target.set(0,14,0);viewer.zoom=.72;viewer.controls.update();viewerMobileFramed=true}else if(viewerMobileFramed){viewer.resetCameraPose();viewer.zoom=.82;viewerMobileFramed=false}}
 
 function renderGoals() {
   const active=goals.filter(g=>!g.archived),archived=goals.filter(g=>g.archived);
