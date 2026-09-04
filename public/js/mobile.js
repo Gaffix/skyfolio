@@ -1,0 +1,13 @@
+(()=>{
+  const mobile=matchMedia('(max-width:760px)'),body=document.body,nav=document.querySelector('#moduleNav');
+  const backdrop=document.createElement('button');backdrop.className='mobile-nav-backdrop';backdrop.type='button';backdrop.setAttribute('aria-label','Close module menu');body.append(backdrop);
+  const dock=document.createElement('nav');dock.className='mobile-dock';dock.setAttribute('aria-label','Mobile navigation');dock.innerHTML='<button data-mobile-action="home"><b>⌂</b><span>Home</span></button><button data-mobile-action="modules"><b>▦</b><span>Modules</span></button><button data-mobile-action="quests"><b>✓</b><span>Quests</span></button><button data-mobile-action="notebook"><b>▤</b><span>Notes</span></button><button data-mobile-action="search"><b>⌕</b><span>Search</span></button>';body.append(dock);
+  const moduleButton=dock.querySelector('[data-mobile-action="modules"]');moduleButton.setAttribute('aria-expanded','false');moduleButton.setAttribute('aria-controls','moduleNav');
+  const closeModules=()=>{body.classList.remove('mobile-modules-open');moduleButton.classList.remove('active');moduleButton.setAttribute('aria-expanded','false')};
+  const scrollToElement=selector=>{closeModules();document.querySelector(selector)?.scrollIntoView({behavior:'smooth',block:'start'})};
+  dock.addEventListener('click',event=>{const button=event.target.closest('[data-mobile-action]');if(!button)return;const action=button.dataset.mobileAction;if(action==='home')scrollTo({top:0,behavior:'smooth'});if(action==='modules'){const open=body.classList.toggle('mobile-modules-open');button.classList.toggle('active',open);button.setAttribute('aria-expanded',String(open))}if(action==='quests')scrollToElement('.planner');if(action==='notebook')document.querySelector('#notebookOpen')?.click();if(action==='search'){scrollTo({top:0,behavior:'smooth'});setTimeout(()=>document.querySelector('#playerInput')?.focus(),250)}});
+  backdrop.addEventListener('click',closeModules);nav?.addEventListener('click',event=>{if(event.target.closest('[data-module]'))closeModules()});
+  document.addEventListener('keydown',event=>{if(event.key==='Escape')closeModules()});
+  const viewportChanged=event=>{if(!event.matches)closeModules()};if(mobile.addEventListener)mobile.addEventListener('change',viewportChanged);else mobile.addListener(viewportChanged);
+  let startY=0;nav?.addEventListener('touchstart',event=>{startY=event.touches[0]?.clientY||0},{passive:true});nav?.addEventListener('touchend',event=>{const endY=event.changedTouches[0]?.clientY||0;if(endY-startY>70)closeModules()},{passive:true});
+})();
