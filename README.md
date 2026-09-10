@@ -15,6 +15,8 @@ Search for a Minecraft username or open a shareable profile URL such as `/gffx`.
 - Profile identity details including Hypixel rank, game mode, co-op members, guild, socials, and API availability
 - IronPath forge goals and material planning for Ironman profiles
 - Personal Quest Board and Notebook
+- Explainable Progress Planner recommendations that can be added to the Quest Board
+- Local 180-day progress history, player comparison, and JSON backup/restore
 - Customizable dashboard widgets, module order, hidden sections, favorites, themes, and performance mode
 - Minecraft-style item lore, colors, formatting, and cached item textures
 - Shareable profile routes and downloadable profile cards
@@ -87,6 +89,7 @@ For hosted deployments, configure `HYPIXEL_API_KEY` as a private environment var
 - `/` — profile search without an automatic API request
 - `/:player` — a player's selected SkyBlock profile
 - `/:player/:module` — a directly shareable module, such as `/gffx/inventory`
+- `/:player/compare/:other` — side-by-side selected-profile comparison
 - `/api/health` — lightweight uptime check that does not contact Hypixel or Mojang
 
 For Render or another uptime monitor, ping `/api/health` instead of a player URL.

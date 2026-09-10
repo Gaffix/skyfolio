@@ -233,7 +233,7 @@ $('#moduleContent').addEventListener('click',e=>{if(e.target.id==='resetWidgets'
 document.querySelectorAll('[data-close-module]').forEach(el=>el.addEventListener('click',()=>closeModule()));
 document.querySelectorAll('[data-close-modal]').forEach(el=>el.addEventListener('click',()=>closeWardrobe()));
 $('#wardrobeTabs').addEventListener('click',e=>{const button=e.target.closest('[data-tab]');if(!button)return;document.querySelectorAll('#wardrobeTabs button').forEach(x=>x.classList.toggle('active',x===button));renderWardrobe(button.dataset.tab);setRoute(button.dataset.tab)});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeWardrobe()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#wardrobeModal').classList.contains('open'))closeWardrobe()});
 let tooltipSlot=null,floatingTooltip=null;
 function placeFloatingTooltip(){if(!tooltipSlot||!floatingTooltip)return;const slot=tooltipSlot.getBoundingClientRect(),tip=floatingTooltip.getBoundingClientRect(),gap=8,pad=8;let top=slot.top-tip.height-gap;if(top<pad)top=slot.bottom+gap;if(top+tip.height>innerHeight-pad)top=Math.max(pad,innerHeight-tip.height-pad);let left=slot.left+slot.width/2-tip.width/2;left=Math.max(pad,Math.min(left,innerWidth-tip.width-pad));floatingTooltip.style.top=`${Math.round(top)}px`;floatingTooltip.style.left=`${Math.round(left)}px`}
 function showFloatingTooltip(slot){const source=slot?.querySelector(':scope > .mc-tooltip');if(!source)return;if(tooltipSlot===slot)return;hideFloatingTooltip();tooltipSlot=slot;floatingTooltip=source.cloneNode(true);floatingTooltip.classList.add('floating-tooltip');floatingTooltip.removeAttribute('style');document.body.appendChild(floatingTooltip);requestAnimationFrame(placeFloatingTooltip)}
