@@ -34,6 +34,7 @@
   <link rel="stylesheet" href="/css/customization.css" />
   <link rel="stylesheet" href="/css/mobile.css?v=2.1.5" />
   <link rel="stylesheet" href="/css/progress-tools.css?v=2.2.0" />
+  <link rel="stylesheet" href="/css/module-workspace.css?v=2.3.0" />
 </head>
 <body>
   <div class="noise"></div>
@@ -58,7 +59,10 @@
       </div>
       <div class="profile-actions"><span class="freshness" id="freshness">Not loaded</span><button class="refresh-btn" id="refreshBtn" title="Refresh API data">↻</button><select id="profileSelect" aria-label="Profile" disabled><option>Select profile</option></select><button class="notebook-open" id="notebookOpen" type="button">▤ Notebook</button><button class="profile-info-open" id="profileInfoOpen" type="button">◇ Profile</button><button class="widgets-open" id="widgetsOpen" type="button">▦ Widgets</button><button class="customize-open" id="customizeOpen" type="button">✦ Customize</button><button class="share" id="shareBtn">↗ &nbsp; Share</button></div>
     </section>
-    <nav class="module-nav" id="moduleNav"><section class="module-group"><small>PROGRESSION</small><div><button data-module="planner">⌁ Planner</button><button data-module="progress">↗ Progress</button><button data-module="ironpath">⛏ IronPath</button><button data-module="skills">✦ Skills</button><button data-module="slayer">⚔ Slayer</button><button data-module="dungeons">♜ Dungeons</button><button data-module="minions">▥ Minions</button><button data-module="collections">▤ Collections</button></div></section><section class="module-group"><small>PROFILE</small><div><button data-module="pets">♞ Pets</button><button data-module="mining">⛏ Mining</button><button data-module="garden">☘ Garden</button><button data-module="accessories">◆ Accessories</button><button data-module="essence">✧ Essence</button><button data-module="museum">▣ Museum</button></div></section><section class="module-group"><small>WORLDS & TOOLS</small><div><button data-module="crimson">♨ Crimson Isle</button><button data-module="rift">◈ Rift</button><button data-module="mayor">♛ Mayor</button><button data-module="events">◷ Events</button><button data-module="networth">◎ Net Worth</button><button data-module="compare">⇄ Compare</button><button data-module="data">⇩ Data</button><button data-module="misc">＋ Misc</button></div></section></nav>
+    <section class="module-library" aria-labelledby="modulesHeading">
+      <header class="module-library-header"><div><div class="eyebrow">EXPLORE YOUR PROFILE</div><h2 id="modulesHeading">Your SkyBlock toolkit</h2><p>Find your next upgrade, track your progress, and plan what comes next.</p></div><span class="module-count">11 modules</span></header>
+      <nav class="module-nav" id="moduleNav" aria-label="Profile modules"></nav>
+    </section>
 
     <section class="dashboard-grid">
       <aside class="left-col">
@@ -104,7 +108,7 @@
       <div class="modal-content" id="wardrobeContent"></div>
     </section>
   </div>
-  <div class="modal" id="moduleModal" aria-hidden="true"><div class="modal-backdrop" data-close-module></div><section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="moduleTitle" tabindex="-1"><header><div><div class="eyebrow">LIVE PROFILE MODULE</div><h2 id="moduleTitle">Profile</h2></div><button class="modal-close" data-close-module aria-label="Close">×</button></header><div class="modal-content" id="moduleContent"></div></section></div>
+  <div class="modal" id="moduleModal" aria-hidden="true"><div class="modal-backdrop" data-close-module></div><section class="modal-panel module-workspace" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="moduleTitle" aria-describedby="moduleDescription"><aside class="module-sidebar"><a class="module-home" href="/" data-close-module>Back to profile</a><div class="eyebrow">YOUR TOOLKIT</div><nav id="moduleSidebar" aria-label="Switch module"></nav></aside><div class="module-main"><header class="module-workspace-header"><div><div class="eyebrow" id="moduleCategory">PROFILE MODULE</div><h2 id="moduleTitle">Profile</h2><p id="moduleDescription"></p></div><button class="modal-close" data-close-module aria-label="Close module">&times;</button></header><div class="modal-content" id="moduleContent"></div></div></section></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/skinview3d@3.4.1/bundles/skinview3d.bundle.js"></script>
   <script src="/js/app.js?v=2.1.3"></script>
@@ -112,8 +116,9 @@
   <script src="/js/profile-depth.js"></script>
   <script src="/js/profile-progress.js"></script>
   <script src="/js/world-depth.js"></script>
+  <script src="/js/progress-tools.js?v=2.2.0"></script>
+  <script src="/js/module-workspace.js?v=2.3.0"></script>
   <script src="/js/customization.js"></script>
   <script src="/js/mobile.js?v=2.1.5"></script>
-  <script src="/js/progress-tools.js?v=2.2.0"></script>
 </body>
 </html>
