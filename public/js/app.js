@@ -164,8 +164,11 @@ function applyProfile(data) {
   profileMeta=data.meta||null;updateFreshness();clearInterval(freshnessTimer);freshnessTimer=setInterval(updateFreshness,1000);
   syncGoals(p.username);
   $('#playerName').textContent=p.username;
+  $('#ironmanBadge').hidden=p.identity?.gameMode!=='ironman';
+  $('#accessoryQuickPower').textContent=number.format(p.accessories?.magicalPower||0)+' MP';
+  $('#forgeQuickState').textContent=(p.ironpath?.processes?.length||0)+' forging';
   renderAvatar(p.username);
-  $('#profileMeta').innerHTML=`<span class="status-dot"></span> Live API data <i></i> ${escapeHtml(p.cuteName)} profile`;
+  $('#profileMeta').innerHTML=`<span class="status-dot"></span> ${escapeHtml(p.cuteName)} <span class="profile-meta-divider">/</span> Level ${number.format(p.skyblockLevel)}`;
   $('#skyblockLevel').textContent=number.format(p.skyblockLevel);
   $('#levelInteger').textContent=Math.floor(p.skyblockLevel);
   const progress=Math.max(0,Math.min(99,(p.skyblockLevel%1)*100));

@@ -34,7 +34,7 @@
   <link rel="stylesheet" href="/css/customization.css" />
   <link rel="stylesheet" href="/css/mobile.css?v=2.1.5" />
   <link rel="stylesheet" href="/css/progress-tools.css?v=2.2.0" />
-  <link rel="stylesheet" href="/css/module-workspace.css?v=2.3.0" />
+  <link rel="stylesheet" href="/css/module-workspace.css?v=2.4.0" />
 </head>
 <body>
   <div class="noise"></div>
@@ -55,12 +55,15 @@
     <section class="profile-head">
       <div class="identity">
         <div class="mini-avatar"><canvas id="avatarCanvas" width="72" height="72" style="width:100%;height:100%;image-rendering:pixelated" aria-label="Player avatar"></canvas></div>
-        <div><div class="eyebrow">SKYBLOCK PROFILE</div><h1 id="playerName">Search a player</h1><div class="meta" id="profileMeta"><span class="status-dot"></span> Ready for live data</div></div>
+        <div><div class="eyebrow">SKYBLOCK PROFILE</div><div class="player-name-row"><h1 id="playerName">Search a player</h1><span id="ironmanBadge" class="ironman-badge" role="img" aria-label="Ironman profile" title="Ironman" hidden>&#9851;</span></div><div class="meta" id="profileMeta"><span class="status-dot"></span> Ready for live data</div></div>
       </div>
-      <div class="profile-actions"><span class="freshness" id="freshness">Not loaded</span><button class="refresh-btn" id="refreshBtn" title="Refresh API data">↻</button><select id="profileSelect" aria-label="Profile" disabled><option>Select profile</option></select><button class="notebook-open" id="notebookOpen" type="button">▤ Notebook</button><button class="profile-info-open" id="profileInfoOpen" type="button">◇ Profile</button><button class="widgets-open" id="widgetsOpen" type="button">▦ Widgets</button><button class="customize-open" id="customizeOpen" type="button">✦ Customize</button><button class="share" id="shareBtn">↗ &nbsp; Share</button></div>
+      <div class="profile-actions"><span class="freshness" id="freshness">Not loaded</span><button class="refresh-btn" id="refreshBtn" title="Refresh API data">↻</button><select id="profileSelect" aria-label="Profile" disabled><option>Select profile</option></select><button class="share" id="shareBtn">↗ &nbsp; Share</button></div>
     </section>
-    <section class="module-library" aria-labelledby="modulesHeading">
-      <header class="module-library-header"><div><div class="eyebrow">EXPLORE YOUR PROFILE</div><h2 id="modulesHeading">Your SkyBlock toolkit</h2><p>Find your next upgrade, track your progress, and plan what comes next.</p></div><span class="module-count">11 modules</span></header>
+    <section class="module-library" aria-label="Profile modules">
+      <div id="moduleEssentials" class="module-essentials">
+        <section class="essential-accessories"><button class="essential-title" data-module="accessories"><span aria-hidden="true">&#9670;</span> Accessories <b id="accessoryQuickPower">&#8212; MP</b></button><div class="essential-shortcuts"><button data-module="accessories" data-accessory-view="calculator">MP Calculator</button><button data-module="accessories" data-accessory-view="missing">Missing Accessories <span aria-hidden="true">&#8599;</span></button></div></section>
+        <button class="essential-forge" data-module="ironpath"><span class="forge-mark" aria-hidden="true">&#9935;</span><strong>IronPath</strong><span class="forge-quick-state" id="forgeQuickState">Forge planner</span><span aria-hidden="true">&#8599;</span></button>
+      </div>
       <nav class="module-nav" id="moduleNav" aria-label="Profile modules"></nav>
     </section>
 
@@ -97,6 +100,8 @@
         </article>
         <article class="card skills"><div class="card-title"><span>TOP SKILLS</span><a href="/skills">All skills</a></div><div id="skillsList"></div></article>
         <article class="card collection"><div class="card-title"><span>COLLECTION PROGRESS</span><b id="collectionPercent">—</b></div><div class="collection-bar"><span id="collectionBar" style="width:0"></span></div><small id="collectionSummary">Search to load collection progress</small></article>
+        <nav id="moduleSecondary" class="secondary-modules" aria-label="Planning and world tools"></nav>
+        <div class="profile-utility-actions" aria-label="Profile settings"><button class="notebook-open" id="notebookOpen" type="button">▤ Notebook</button><button class="profile-info-open" id="profileInfoOpen" type="button">◇ Profile</button><button class="widgets-open" id="widgetsOpen" type="button">▦ Widgets</button><button class="customize-open" id="customizeOpen" type="button">✦ Customize</button></div>
       </aside>
     </section>
   </main>
@@ -111,14 +116,14 @@
   <div class="modal" id="moduleModal" aria-hidden="true"><div class="modal-backdrop" data-close-module></div><section class="modal-panel module-workspace" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="moduleTitle" aria-describedby="moduleDescription"><aside class="module-sidebar"><a class="module-home" href="/" data-close-module>Back to profile</a><div class="eyebrow">YOUR TOOLKIT</div><nav id="moduleSidebar" aria-label="Switch module"></nav></aside><div class="module-main"><header class="module-workspace-header"><div><div class="eyebrow" id="moduleCategory">PROFILE MODULE</div><h2 id="moduleTitle">Profile</h2><p id="moduleDescription"></p></div><button class="modal-close" data-close-module aria-label="Close module">&times;</button></header><div class="modal-content" id="moduleContent"></div></div></section></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/skinview3d@3.4.1/bundles/skinview3d.bundle.js"></script>
-  <script src="/js/app.js?v=2.1.3"></script>
+  <script src="/js/app.js?v=2.4.0"></script>
   <script src="/js/events-calendar.js"></script>
   <script src="/js/profile-depth.js"></script>
-  <script src="/js/profile-progress.js"></script>
+  <script src="/js/profile-progress.js?v=2.4.0"></script>
   <script src="/js/world-depth.js"></script>
   <script src="/js/progress-tools.js?v=2.2.0"></script>
-  <script src="/js/module-workspace.js?v=2.3.0"></script>
-  <script src="/js/customization.js"></script>
+  <script src="/js/module-workspace.js?v=2.4.0"></script>
+  <script src="/js/customization.js?v=2.4.0"></script>
   <script src="/js/mobile.js?v=2.1.5"></script>
 </body>
 </html>
