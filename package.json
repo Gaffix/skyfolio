@@ -1,12 +1,13 @@
 {
   "name": "skyfolio",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "private": true,
   "scripts": {
     "start": "node src/server.js",
-    "check": "node --check src/server.js && node --check src/app.js && node --check src/config.js && node --check src/items.js && node --check src/forge-recipes.js && node --check scripts/update-forge-recipes.js && node --check scripts/download-item-textures.js && node --check public/js/app.js && node --check public/js/profile-depth.js && node --check public/js/profile-progress.js && node --check public/js/world-depth.js && node --check public/js/customization.js && node --check public/js/mobile.js && node --check public/js/progress-tools.js && node --check public/js/module-workspace.js && node test/app.test.js",
-    "test": "node test/app.test.js",
-    "cache:textures": "node scripts/download-item-textures.js"
+    "check": "node scripts/check.js && node --test test/app.test.js test/improvements.test.js",
+    "test": "node --test test/app.test.js test/improvements.test.js",
+    "cache:textures": "node scripts/download-item-textures.js",
+    "test:browser": "node test/browser-smoke.cjs"
   },
   "engines": {
     "node": ">=18.0.0-0"

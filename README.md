@@ -127,3 +127,22 @@ Skyfolio only displays information exposed by Mojang and the Hypixel APIs. Some 
 ## License
 
 No license has been added yet. All rights are reserved unless a license is provided later.
+
+## Profile loading, availability, and planners
+
+The dashboard requests `/api/profile/:player?view=core` first, then loads the default full response in the background. Both responses include `profile.availability`; `meta.phase` identifies `core` or `full`. Source states distinguish loading, live/cached values, stale last-known data, fields not exposed by Hypixel, and temporarily unavailable services. Missing API fields are not treated as evidence of zero progress. Optional-source failures preserve the last successful value and retry after a short cooldown.
+
+Concurrent requests share upstream profile/resource work. Normalized profile responses are cached for 30 seconds per raw snapshot and selected profile. `/assets/site.js` and `/assets/site.css` combine the files in `src/asset-manifest.json`, preserve their load order, support gzip and ETag revalidation, and refresh when source files change. The 3D viewer library is loaded only after selecting a player. Failed item textures are served with `no-store` and are never retained as successful cache entries.
+
+Accessories includes an item-based MP plan, family-aware upgrade candidates, estimated coins per MP, recombobulations, and stored accessories that can be activated. Selection keeps one upgrade per family. The estimate starts from the API's highest reported MP, so it is not a recalculation of the current bag; special and dynamic effects may differ in-game. Ironman candidates omit market prices. Unknown prices remain unpriced, not free.
+
+`/api/acquisition/:itemId` retrieves structured recipe/requirement data from NotEnoughUpdates and an obtaining excerpt from the maintained [Hypixel SkyBlock community wiki](https://hypixelskyblock.minecraft.wiki/). The former official wiki was closed in July 2026. Wiki requests happen only when a player opens obtaining details; failures leave a direct wiki link and any available recipe data. Each excerpt links to its source. Successful lookups are cached for a day; unavailable excerpts are retried after a minute. Acquisition requirements are informational, not a claim that the profile meets every unlock requirement.
+
+IronPath allocates owned materials and intermediates once across goals in their displayed priority order. Move goals up or down to change allocation, and copy the combined missing-material list. Forge duration estimates use base recipe times.
+
+Backup imports now validate record shapes and show a preview before writing. Merge keeps existing entries on identifier conflicts; replace replaces matching records only. Unrelated records are retained. A failed write restores the previous values when browser storage permits.
+
+### Validation
+
+- `npm run check` checks every JavaScript file and the browser bundle, then runs unit and HTTP integration tests.
+- `npm run test:browser` runs the desktop/mobile smoke suite with fixture profile data and no external API calls. Install Playwright and its Chromium headless shell as development tooling first, or set `PLAYWRIGHT_MODULE` to an existing Playwright module's absolute path. Browser tooling is not needed to run the site.

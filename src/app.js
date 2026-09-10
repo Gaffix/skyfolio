@@ -5,6 +5,14 @@ const path = require('node:path');
 const { publicRoot, textureCacheRoot, profileCacheMs: CACHE_MS, hypixelApiKey } = require('./config');
 const { cleanName, titleCase, readEquipment, readLoadouts, readStorage, accessoryStats } = require('./items');
 const { recipes: forgeRecipes, recipeById, itemName } = require('./forge-recipes');
+const {ResourceCache}=require('./resource-cache');
+const {assetBundle}=require('./assets');
+const {buildAvailability}=require('./data-availability');
+const {buildAccessoryPlanner}=require('./accessory-planner');
+const {createAcquisitionService}=require('./acquisition');
+const sources=new ResourceCache();
+const getAcquisition=createAcquisitionService({resourceJson,cache:sources});
+const profileRequests=new Map(),shapedCache=new Map();
 const cache = new Map();
 let collectionResources={time:0,data:null};
 let bazaarResources={time:0,data:null};
@@ -25,25 +33,28 @@ function cacheSet(map,key,value,max=500){map.delete(key);map.set(key,value);prun
 const wait=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function fetchWithRetry(url,options={},attempts=2){let lastError,lastResponse;for(let attempt=0;attempt<attempts;attempt++){try{const response=await fetch(url,{...options,signal:AbortSignal.timeout(8000)});lastResponse=response;if(response.status!==429&&response.status<500)return response}catch(error){lastError=error}if(attempt+1<attempts)await wait(250*(attempt+1))}if(lastResponse)return lastResponse;const host=new URL(url).hostname;throw Object.assign(new Error(`Could not reach ${host}. Check your connection and try again.`),{status:502,cause:lastError})}
 async function fetchJsonWithRetry(url,options={},attempts=2){let lastError;for(let attempt=0;attempt<attempts;attempt++){try{const response=await fetchWithRetry(url,options,1),text=await response.text();return{response,data:JSON.parse(text)}}catch(error){lastError=error;if(attempt+1<attempts)await wait(300*(attempt+1))}}if(lastError?.status)throw lastError;throw Object.assign(new Error(`Received an incomplete response from ${new URL(url).hostname}. Please try again.`),{status:502,cause:lastError})}
-async function resolvePlayer(username){const urls=[`https://api.minecraftservices.com/minecraft/profile/lookup/name/${encodeURIComponent(username)}`,`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(username)}`];const results=await Promise.all(urls.map(async url=>{try{const response=await fetchWithRetry(url,{},2);if(response.ok)return{player:await response.json()};return{status:response.status}}catch(error){return{error}}}));const match=results.find(result=>result.player);if(match)return match.player;if(results.every(result=>result.status===404))throw Object.assign(new Error('Minecraft player not found.'),{status:404});throw results.find(result=>result.error)?.error||Object.assign(new Error('Minecraft profile lookup is temporarily unavailable.'),{status:502})}
-async function getCollectionResources(){if(collectionResources.data&&Date.now()-collectionResources.time<60*60*1000)return collectionResources.data;try{const response=await fetchWithRetry('https://api.hypixel.net/v2/resources/skyblock/collections');if(!response.ok)throw new Error();const data=await response.json();collectionResources={time:Date.now(),data:data.collections||{}}}catch{collectionResources={time:Date.now(),data:{}}}return collectionResources.data}
-async function getBazaarResources(){if(bazaarResources.data&&Date.now()-bazaarResources.time<5*60*1000)return bazaarResources.data;try{const response=await fetchWithRetry('https://api.hypixel.net/v2/skyblock/bazaar');const data=await response.json();bazaarResources={time:Date.now(),data:data.products||{}}}catch{bazaarResources={time:Date.now(),data:{}}}return bazaarResources.data}
-async function getLowestBinResources(){if(lowestBinResources.data&&Date.now()-lowestBinResources.time<10*60*1000)return lowestBinResources.data;try{const response=await fetchWithRetry('https://moulberry.codes/lowestbin.json',{},2);if(!response.ok)throw new Error();lowestBinResources={time:Date.now(),data:await response.json()}}catch{lowestBinResources={time:Date.now(),data:{}}}return lowestBinResources.data}
-async function getBestiaryResources(){if(bestiaryResources.data&&Date.now()-bestiaryResources.time<6*60*60*1000)return bestiaryResources.data;try{const response=await fetchWithRetry('https://raw.githubusercontent.com/NotEnoughUpdates/NotEnoughUpdates-REPO/master/constants/bestiary.json',{},2);if(!response.ok)throw new Error();bestiaryResources={time:Date.now(),data:await response.json()}}catch{bestiaryResources={time:Date.now(),data:{}}}return bestiaryResources.data}
-async function getAccessoryParents(){
-  if(accessoryParentResources.data&&Date.now()-accessoryParentResources.time<6*60*60*1000)return accessoryParentResources.data;
-  const results=await Promise.allSettled(['https://raw.githubusercontent.com/NotEnoughUpdates/NotEnoughUpdates-REPO/master/constants/parents.json','https://api.hypixel.net/v2/resources/skyblock/items'].map(async url=>{const response=await fetchWithRetry(url,{},2);if(!response.ok)throw new Error('Accessory resources unavailable');return response.json()}));
-  const parents=results[0].status==='fulfilled'?results[0].value:{},resource=results[1].status==='fulfilled'?results[1].value:null;
-  const catalog=Array.isArray(resource?.items)?resource.items.filter(item=>item.category==='ACCESSORY'):null;
-  const data={parents,catalog};
-  if(catalog?.length)accessoryParentResources={time:Date.now(),data};
-  return data;
-}
-async function getElectionResources(){if(electionResources.data&&Date.now()-electionResources.time<5*60*1000)return electionResources.data;try{const response=await fetchWithRetry('https://api.hypixel.net/v2/resources/skyblock/election'),data=await response.json();electionResources={time:Date.now(),data:{lastUpdated:data.lastUpdated||Date.now(),mayor:data.mayor||{},current:data.current||{}}}}catch{electionResources={time:Date.now(),data:{mayor:{},current:{}}}}return electionResources.data}
-async function getGarden(profileId){const cached=gardenCache.get(profileId);if(cached&&Date.now()-cached.time<10*60*1000)return cached.data;try{const response=await fetchWithRetry(`https://api.hypixel.net/v2/skyblock/garden?profile=${profileId}`,{headers:{'API-Key':hypixelApiKey}});const body=await response.json();const data=body.garden||{};cacheSet(gardenCache,profileId,{time:Date.now(),data},500);return data}catch{return cached?.data||{}}}
-async function getMuseum(profileId){const cached=museumCache.get(profileId);if(cached&&Date.now()-cached.time<10*60*1000)return cached.data;try{const response=await fetchWithRetry(`https://api.hypixel.net/v2/skyblock/museum?profile=${profileId}`,{headers:{'API-Key':hypixelApiKey}}),body=await response.json(),data=body.members||{};cacheSet(museumCache,profileId,{time:Date.now(),data},500);return data}catch{return cached?.data||{}}}
+async function resolvePlayer(username){return sources.get('uuid:'+username.toLowerCase(),3600000,()=>resolvePlayerUncached(username));}
+async function resolvePlayerUncached(username){const urls=[`https://api.minecraftservices.com/minecraft/profile/lookup/name/${encodeURIComponent(username)}`,`https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(username)}`];const results=await Promise.all(urls.map(async url=>{try{const response=await fetchWithRetry(url,{},2);if(response.ok)return{player:await response.json()};return{status:response.status}}catch(error){return{error}}}));const match=results.find(result=>result.player);if(match)return match.player;if(results.every(result=>result.status===404))throw Object.assign(new Error('Minecraft player not found.'),{status:404});throw results.find(result=>result.error)?.error||Object.assign(new Error('Minecraft profile lookup is temporarily unavailable.'),{status:502})}
+async function resourceJson(url,options={}){const response=await fetchWithRetry(url,options);if(!response.ok)throw Object.assign(new Error('Source returned '+response.status),{status:response.status});const data=await response.json();if(data.success===false)throw new Error(data.cause||'Source unavailable');return data;}
+async function resource(key,ttl,loader,fallback){try{return await sources.get(key,ttl,loader)}catch{return fallback}}
+async function getCollectionResources(){const data=await resource('collections',3600000,async()=>{const d=await resourceJson('https://api.hypixel.net/v2/resources/skyblock/collections');if(!d.collections)throw Error('Collection catalog unavailable');return d.collections},{});collectionResources={data,time:sources.peek('collections')?.time||0};return data}
+async function getBazaarResources(){const data=await resource('bazaar',300000,async()=>{const d=await resourceJson('https://api.hypixel.net/v2/skyblock/bazaar');if(!d.products)throw Error('Bazaar unavailable');return d.products},{});bazaarResources={data,time:sources.peek('bazaar')?.time||0};return data}
+async function getLowestBinResources(){const data=await resource('lowestBin',600000,()=>resourceJson('https://moulberry.codes/lowestbin.json'),{});lowestBinResources={data,time:sources.peek('lowestBin')?.time||0};return data}
+async function getBestiaryResources(){const data=await resource('bestiary',21600000,()=>resourceJson('https://raw.githubusercontent.com/NotEnoughUpdates/NotEnoughUpdates-REPO/master/constants/bestiary.json'),{});bestiaryResources={data,time:sources.peek('bestiary')?.time||0};return data}
+async function getAccessoryParents(){const [parents,catalog]=await Promise.all([resource('accessoryParents',21600000,()=>resourceJson('https://raw.githubusercontent.com/NotEnoughUpdates/NotEnoughUpdates-REPO/master/constants/parents.json'),{}),resource('accessoryCatalog',21600000,async()=>{const d=await resourceJson('https://api.hypixel.net/v2/resources/skyblock/items');if(!Array.isArray(d.items))throw Error('Accessory catalog unavailable');return d.items.filter(x=>x.category==='ACCESSORY')},null)]);return {parents,catalog}}
+async function getElectionResources(){const data=await resource('election',300000,()=>resourceJson('https://api.hypixel.net/v2/resources/skyblock/election'),{mayor:{},current:{}});electionResources={data,time:sources.peek('election')?.time||0};return data}
+async function getGarden(id){return resource('garden:'+id,600000,async()=>{const d=await resourceJson('https://api.hypixel.net/v2/skyblock/garden?profile='+id,{headers:{'API-Key':hypixelApiKey}});if(!d.garden)throw Error('Garden data not exposed');return d.garden},{});}
+async function getMuseum(id){return resource('museum:'+id,600000,async()=>{const d=await resourceJson('https://api.hypixel.net/v2/skyblock/museum?profile='+id,{headers:{'API-Key':hypixelApiKey}});if(!d.members)throw Error('Museum data not exposed');return d.members},{});}
 async function getMinionRecipe(id){if(minionRecipeCache.has(id))return minionRecipeCache.get(id);const pending=(async()=>{const response=await fetchWithRetry(`https://raw.githubusercontent.com/NotEnoughUpdates/NotEnoughUpdates-REPO/master/items/${encodeURIComponent(id)}.json`,{},2);if(!response.ok)throw Object.assign(new Error('Recipe unavailable.'),{status:404});const data=await response.json(),grid=Object.entries(data.recipe||{}).map(([slot,value])=>{const[index,count]=String(value).split(':');return{slot,id:index,count:Number(count||1),name:titleCase(index),icon:`/api/item-texture/${encodeURIComponent(index)}?v=3`}}),totals={};for(const item of grid)totals[item.id]=(totals[item.id]||0)+item.count;return{id,name:String(data.displayname||titleCase(id)).replace(/§[0-9a-fk-or]/gi,''),grid,ingredients:Object.entries(totals).map(([itemId,count])=>({id:itemId,name:titleCase(itemId),count,icon:`/api/item-texture/${encodeURIComponent(itemId)}?v=3`}))}})();cacheSet(minionRecipeCache,id,pending,500);try{return await pending}catch(error){minionRecipeCache.delete(id);throw error}}
-async function getIdentityData(profile,uuid){const key=`${profile.profile_id}:${uuid}`,cached=identityCache.get(key);if(cached&&Date.now()-cached.time<30*60*1000)return cached.data;const members=await Promise.all(Object.entries(profile.members||{}).map(async([id,member])=>{let username=id.slice(0,8);try{const response=await fetchWithRetry(`https://sessionserver.mojang.com/session/minecraft/profile/${id.replaceAll('-','')}`,{},1);if(response.ok)username=(await response.json()).name||username}catch{}return{uuid:id.replaceAll('-',''),username,removed:Boolean(member.deletion_notice?.timestamp),joined:Number(member.profile?.first_join||0),head:`/api/avatar/${encodeURIComponent(username)}`}}));let guild=null;try{const response=await fetchWithRetry(`https://api.hypixel.net/v2/guild?player=${uuid}`,{headers:{'API-Key':hypixelApiKey}},1);if(response.ok){const body=await response.json(),g=body.guild;if(g){const guildMember=(g.members||[]).find(x=>String(x.uuid).replaceAll('-','')===uuid.replaceAll('-',''));guild={name:g.name,tag:g.tag||null,rank:guildMember?.rank||null,created:Number(g.created||0),members:(g.members||[]).length}}}}catch{}const data={members,guild};cacheSet(identityCache,key,{time:Date.now(),data},1000);return data}
+async function getIdentityData(profile,uuid){
+  const [members,body]=await Promise.all([
+    Promise.all(Object.entries(profile.members||{}).map(async([id,member])=>{const data=await sources.get('session:'+id,3600000,()=>resourceJson('https://sessionserver.mojang.com/session/minecraft/profile/'+id.replaceAll('-','')));return {uuid:id.replaceAll('-',''),username:data.name,removed:Boolean(member.deletion_notice?.timestamp),joined:Number(member.profile?.first_join||0),head:'/api/avatar/'+encodeURIComponent(data.name)};})),
+    resourceJson('https://api.hypixel.net/v2/guild?player='+uuid,{headers:{'API-Key':hypixelApiKey}})
+  ]);
+  const g=body.guild,guildMember=g?.members?.find(x=>String(x.uuid).replaceAll('-','')===uuid.replaceAll('-',''));
+  return {members,guild:g?{name:g.name,tag:g.tag||null,rank:guildMember?.rank||null,created:Number(g.created||0),members:g.members?.length||0}:null};
+}
+
 
 const skillXp = [50,125,200,300,500,750,1000,1500,2000,3500,5000,7500,10000,15000,20000,30000,50000,75000,100000,200000,300000,400000,500000,600000,700000,800000,900000,1000000,1100000,1200000,1300000,1400000,1500000,1600000,1700000,1800000,1900000,2000000,2100000,2200000,2300000,2400000,2500000,2600000,2750000,2900000,3100000,3400000,3700000,4000000,4300000,4600000,4900000,5200000,5500000,5800000,6100000,6400000,6700000,7000000];
 const dungeonXp = [50,75,110,160,230,330,470,670,950,1340,1890,2665,3760,5260,7380,10300,14400,20000,27600,38000,52500,71500,97000,132000,180000,243000,328000,445000,600000,800000,1065000,1410000,1900000,2500000,3300000,4300000,5600000,7200000,9200000,12000000,15000000,19000000,24000000,30000000,38000000,48000000,60000000,75000000,93000000,116250000];
@@ -156,55 +167,89 @@ function shapeProfile(profile, uuid, username, count, collectionResources, besti
 
 async function getSkin(username){const player=await resolvePlayer(username);const sessionRes=await fetchWithRetry(`https://sessionserver.mojang.com/session/minecraft/profile/${player.id}`);if(!sessionRes.ok)throw Object.assign(new Error('Skin profile unavailable.'),{status:502});const session=await sessionRes.json();const texture=session.properties?.find(x=>x.name==='textures');const skinUrl=texture&&JSON.parse(Buffer.from(texture.value,'base64').toString('utf8')).textures?.SKIN?.url;if(!skinUrl||new URL(skinUrl).hostname!=='textures.minecraft.net')throw Object.assign(new Error('This player has no custom skin.'),{status:404});const image=await fetchWithRetry(skinUrl);if(!image.ok)throw Object.assign(new Error('Skin image unavailable.'),{status:502});return Buffer.from(await image.arrayBuffer())}
 async function getAvatar(username){const player=await resolvePlayer(username);const image=await fetchWithRetry(`https://mc-heads.net/avatar/${player.id}/72`);if(!image.ok)throw Object.assign(new Error('Player head unavailable.'),{status:502});return Buffer.from(await image.arrayBuffer())}
-async function getItemTexture(id){if(itemTextureCache.has(id))return itemTextureCache.get(id);const file=path.join(textureCacheRoot,`${encodeURIComponent(id)}.png`);const pending=(async()=>{try{return await fs.promises.readFile(file)}catch{}let response;try{response=await fetchWithRetry(`https://sky.shiiyu.moe/api/item/${encodeURIComponent(id)}`,{},1)}catch{}const cacheable=Boolean(response?.ok);if(!cacheable)response=await fetchWithRetry('https://raw.githubusercontent.com/InventivetalentDev/minecraft-assets/1.21.4/assets/minecraft/textures/item/paper.png',{},1);const image=Buffer.from(await response.arrayBuffer());if(cacheable)try{await fs.promises.mkdir(textureCacheRoot,{recursive:true});await fs.promises.writeFile(file,image)}catch{}return image})();cacheSet(itemTextureCache,id,pending,2000);try{return await pending}catch(error){itemTextureCache.delete(id);throw error}}
+async function getItemTexture(id){
+  if(itemTextureCache.has(id))return itemTextureCache.get(id);
+  const file=path.join(textureCacheRoot,encodeURIComponent(id)+'.png');
+  const pending=(async()=>{
+    try{const image=await fs.promises.readFile(file);if(validImage(image))return {image,fallback:false}}catch{}
+    let response;try{response=await fetchWithRetry('https://sky.shiiyu.moe/api/item/'+encodeURIComponent(id),{},1)}catch{}
+    if(response?.ok){const image=Buffer.from(await response.arrayBuffer());if(validImage(image)){try{await fs.promises.mkdir(textureCacheRoot,{recursive:true});await fs.promises.writeFile(file,image)}catch{}return {image,fallback:false}}}
+    const fallback=Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect x="5" y="3" width="22" height="26" rx="3" fill="#685866"/><path d="M10 11h12M10 16h12M10 21h8" stroke="#b6a0ad"/></svg>');
+    return {image:fallback,fallback:true};
+  })();cacheSet(itemTextureCache,id,pending,2000);
+  try{const result=await pending;if(result.fallback)itemTextureCache.delete(id);return result}catch(error){itemTextureCache.delete(id);throw error}
+}
+function validImage(image){return image.length>12&&(image.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10]))||(image.subarray(0,4).toString()==='RIFF'&&image.subarray(8,12).toString()==='WEBP'));}
+
 
 function buildRecommendations(profile,bazaar={},lowestBin={}){
   const rows=[],add=row=>rows.push({...row,progress:Math.max(0,Math.min(100,Math.round(row.progress||0))),confidence:row.confidence||'high'}),price=id=>Number(lowestBin[id]||bazaar[id]?.quick_status?.sellPrice||bazaar[id]?.quick_status?.buyPrice||0)||null;
   const skills=Object.entries(profile.skills||{}).filter(([name,value])=>!['runecrafting','social'].includes(name)&&Number.isFinite(value)).sort((a,b)=>a[1]-b[1]);
-  if(skills[0]){const[name,value]=skills[0],target=Math.floor(value)+1;add({id:`skill-${name}-${target}`,category:'skills',title:`Reach ${titleCase(name)} ${target}`,reason:'This is currently your lowest exposed core skill.',current:value,target,progress:value/target*100,estimatedCost:null,module:'skills'})}
+  if(skills[0]&&profile.availability?.skills?.state!=='not_shared'){const[name,value]=skills[0],target=Math.floor(value)+1;add({id:`skill-${name}-${target}`,category:'skills',title:`Reach ${titleCase(name)} ${target}`,reason:'This is currently your lowest exposed core skill.',current:value,target,progress:value/target*100,estimatedCost:null,module:'skills'})}
   const minions=profile.minions||{};if(minions.nextSlot)add({id:`minion-slot-${minions.nextSlot}`,category:'minions',title:`Unlock minion slot ${minions.slots+1}`,reason:`Craft ${minions.nextSlotRemaining} more unique minion tiers.`,current:minions.uniqueCrafts,target:minions.nextSlot,progress:minions.uniqueCrafts/minions.nextSlot*100,estimatedCost:null,module:'minions'});
-  const collection=(profile.collections?.categories||[]).flatMap(x=>x.items||[]).filter(x=>x.completed<x.totalTiers).sort((a,b)=>b.percent-a.percent)[0];if(collection)add({id:`collection-${collection.id}-${collection.completed+1}`,category:'collections',title:`Complete ${collection.name} tier ${collection.completed+1}`,reason:'This is one of your closest unfinished collection tiers.',current:collection.amount,target:collection.nextAmount,progress:collection.percent,estimatedCost:null,module:'collections'});
-  const accessory=profile.accessories?.missingUpgrades?.[0];if(accessory)add({id:`accessory-${accessory.id}`,category:'accessories',title:`Upgrade to ${accessory.name}`,reason:`Direct upgrade from ${accessory.from}.`,current:0,target:1,progress:0,estimatedCost:price(accessory.id),module:'accessories',confidence:price(accessory.id)?'medium':'low'});
+  const collection=(profile.collections?.categories||[]).flatMap(x=>x.items||[]).filter(x=>x.completed<x.totalTiers).sort((a,b)=>b.percent-a.percent)[0];if(collection&&!['not_shared','unavailable','loading'].includes(profile.availability?.collections?.state))add({id:`collection-${collection.id}-${collection.completed+1}`,category:'collections',title:`Complete ${collection.name} tier ${collection.completed+1}`,reason:'This is one of your closest unfinished collection tiers.',current:collection.amount,target:collection.nextAmount,progress:collection.percent,estimatedCost:null,module:'collections'});
+  const accessory=profile.accessories?.planner?.candidates?.find(x=>x.kind==='upgrade')||profile.accessories?.missingUpgrades?.[0];if(accessory)add({id:`accessory-${accessory.id}`,category:'accessories',title:`Upgrade to ${accessory.name}`,reason:`Direct upgrade from ${accessory.from}.`,current:0,target:1,progress:0,estimatedCost:price(accessory.id),module:'accessories',confidence:price(accessory.id)?'medium':'low'});
   const cata=Number(profile.catacombs||0),target=Math.min(50,Math.floor(cata)+1);if(target>cata)add({id:`catacombs-${target}`,category:'dungeons',title:`Reach Catacombs ${target}`,reason:'Your next Catacombs level is a clear progression milestone.',current:cata,target,progress:cata/target*100,estimatedCost:null,module:'dungeons'});
   return rows.sort((a,b)=>b.progress-a.progress).slice(0,8);
 }
 
-async function getProfile(username, requestedId, force=false) {
-  if (!hypixelApiKey) throw Object.assign(new Error('Missing HYPIXEL_API_KEY. Add it to the .env file and restart the server.'), { status: 503 });
-  const key = username.toLowerCase();
-  let raw = cache.get(key);
-  let stale=false,warnings=[];
-  if(force){const last=refreshCooldowns.get(key)||0,remaining=60_000-(Date.now()-last);if(remaining>0)throw Object.assign(new Error('This profile was refreshed recently. Please wait before refreshing again.'),{status:429,retryAfter:Math.ceil(remaining/1000)});refreshCooldowns.set(key,Date.now());pruneCache(refreshCooldowns,1000)}
-  if (force || !raw || Date.now() - raw.time > CACHE_MS) {
-    try{const player = await resolvePlayer(username);
-      const {response:hypixel,data} = await fetchJsonWithRetry(`https://api.hypixel.net/v2/skyblock/profiles?uuid=${player.id}`, { headers: { 'API-Key': hypixelApiKey } });
-      if (!hypixel.ok || !data.success) throw Object.assign(new Error(data.cause || `Hypixel returned ${hypixel.status}.`), { status: hypixel.status });
-      let playerData={};try{const general=await fetchJsonWithRetry(`https://api.hypixel.net/v2/player?uuid=${player.id}`,{headers:{'API-Key':hypixelApiKey}},1);if(general.response.ok)playerData=general.data.player||{}}catch{warnings.push('General Hypixel player data is temporarily unavailable.')}
-      raw = { time: Date.now(), player, playerData, profiles: data.profiles || [], rateLimit:{limit:hypixel.headers.get('ratelimit-limit'),remaining:hypixel.headers.get('ratelimit-remaining'),reset:hypixel.headers.get('ratelimit-reset')} };cacheSet(cache,key,raw,500);
-    }catch(error){if(raw&&Date.now()-raw.time<60*60*1000){stale=true;warnings.push('Live profile services are unavailable; showing recently cached data.')}else throw error}
-  }
-  if (!raw.profiles.length) throw Object.assign(new Error('This player has no SkyBlock profiles.'), { status: 404 });
-  const chosen = raw.profiles.find(p => p.profile_id === requestedId) || raw.profiles.find(p => p.selected) || raw.profiles[0];
-  const [resources,bestiary,parents,garden,bazaar,lowestBin,election,museum,identity]=await Promise.all([getCollectionResources(),getBestiaryResources(),getAccessoryParents(),getGarden(chosen.profile_id),getBazaarResources(),getLowestBinResources(),getElectionResources(),getMuseum(chosen.profile_id),getIdentityData(chosen,raw.player.id)]);
-  const shaped=shapeProfile(chosen, raw.player.id, raw.player.name, raw.profiles.length, resources,bestiary,parents,garden,bazaar,lowestBin,election,museum,raw.playerData||{},identity);shaped.recommendations=buildRecommendations(shaped,bazaar,lowestBin);
-  return { profile:shaped, profiles: raw.profiles.map(p => ({ id:p.profile_id, cuteName:p.cute_name || 'Unnamed', selected:Boolean(p.selected) })),meta:{fetchedAt:raw.time,expiresAt:raw.time+CACHE_MS,stale,warnings,sources:{profile:raw.time,collections:collectionResources.time,bestiary:bestiaryResources.time,bazaar:bazaarResources.time,lowestBin:lowestBinResources.time,election:electionResources.time},rateLimit:raw.rateLimit||{}} };
+async function loadRawProfile(username,force){
+  const key=username.toLowerCase();if(profileRequests.has(key))return profileRequests.get(key);
+  const previous=cache.get(key);
+  if(!force&&previous&&Date.now()-previous.time<CACHE_MS)return {...previous,stale:false};
+  if(force){const remaining=60000-(Date.now()-(refreshCooldowns.get(key)||0));if(remaining>0)throw Object.assign(Error('Please wait before refreshing again.'),{status:429,retryAfter:Math.ceil(remaining/1000)});cacheSet(refreshCooldowns,key,Date.now(),1000)}
+  const pending=(async()=>{try{
+    const player=await resolvePlayer(username);
+    const {response,data}=await fetchJsonWithRetry('https://api.hypixel.net/v2/skyblock/profiles?uuid='+player.id,{headers:{'API-Key':hypixelApiKey}});
+    if(!response.ok||!data.success)throw Object.assign(Error(data.cause||'Hypixel profile unavailable'),{status:response.status>=400?response.status:502});
+    const raw={time:Date.now(),player,profiles:data.profiles||[],rateLimit:{remaining:response.headers.get('ratelimit-remaining'),reset:response.headers.get('ratelimit-reset')}};
+    cacheSet(cache,key,raw,500);return {...raw,stale:false};
+  }catch(error){if(previous&&Date.now()-previous.time<3600000)return {...previous,stale:true};throw error}finally{profileRequests.delete(key)}})();
+  profileRequests.set(key,pending);return pending;
+}
+async function getProfile(username,requestedId,force=false,view='full'){
+  if(!hypixelApiKey)throw Object.assign(Error('Missing HYPIXEL_API_KEY. Configure it on the server.'),{status:503});
+  const raw=await loadRawProfile(username,force);
+  if(!raw.profiles.length)throw Object.assign(Error('This player has no SkyBlock profiles.'),{status:404});
+  const chosen=raw.profiles.find(p=>p.profile_id===requestedId)||raw.profiles.find(p=>p.selected)||raw.profiles[0],core=view==='core';
+  const cacheKey=raw.player.id+':'+chosen.profile_id+':'+raw.time+':'+view+':'+raw.stale;
+  const cached=shapedCache.get(cacheKey);if(cached&&Date.now()-cached.time<30000)return cached.value;
+  const pending=(async()=>{
+    const [resources,bestiary,parents,garden,bazaar,lowestBin,election,museum,identity,playerData]=core?[{}, {}, {parents:{},catalog:null},{},{},{},{mayor:{},current:{}},{},{},{}]:await Promise.all([
+      getCollectionResources(),getBestiaryResources(),getAccessoryParents(),getGarden(chosen.profile_id),getBazaarResources(),getLowestBinResources(),getElectionResources(),getMuseum(chosen.profile_id),
+      resource('identity:'+chosen.profile_id,1800000,()=>getIdentityData(chosen,raw.player.id),{}),
+      resource('player:'+raw.player.id,300000,async()=>{const d=await resourceJson('https://api.hypixel.net/v2/player?uuid='+raw.player.id,{headers:{'API-Key':hypixelApiKey}});return d.player||{}},{})]);
+    const shaped=shapeProfile(chosen,raw.player.id,raw.player.name,raw.profiles.length,resources,bestiary,parents,garden,bazaar,lowestBin,election,museum,playerData,identity);
+    const states=Object.fromEntries(['collections','bestiary','accessoryCatalog','accessoryParents','election'].map(key=>[key,sources.status(key)]));
+    states.garden=sources.status('garden:'+chosen.profile_id);states.museum=sources.status('museum:'+chosen.profile_id);states.identity=sources.status('identity:'+chosen.profile_id);
+    const priceStates=[sources.status('bazaar'),sources.status('lowestBin')];states.prices={state:priceStates.some(x=>x.state==='unavailable')?'unavailable':priceStates.some(x=>x.state==='stale')?'stale':'cached',fetchedAt:Math.min(...priceStates.map(x=>x.fetchedAt||0))||null};
+    shaped.availability=buildAvailability(memberOf(chosen,raw.player.id)||{},chosen,{core,stale:raw.stale,fetchedAt:raw.time,sources:states});
+    shaped.accessories.planner=buildAccessoryPlanner(shaped.accessories,parents,bazaar,lowestBin,shaped.identity.gameMode==='ironman');
+    shaped.accessories.planner.available=!core&&states.accessoryParents.state!=='unavailable'&&shaped.availability.inventory.state!=='not_shared';
+    if(!shaped.accessories.planner.available)shaped.accessories.planner.candidates=[];
+    shaped.recommendations=core?[]:buildRecommendations(shaped,bazaar,lowestBin);
+    return {profile:shaped,profiles:raw.profiles.map(p=>({id:p.profile_id,cuteName:p.cute_name||'Unnamed',selected:Boolean(p.selected)})),meta:{phase:core?'core':'full',fetchedAt:raw.time,expiresAt:raw.time+CACHE_MS,stale:raw.stale,warnings:raw.stale?['Live profile services are unavailable; showing cached data.']:[],sources:states,rateLimit:raw.rateLimit}};
+  })();cacheSet(shapedCache,cacheKey,{time:Date.now(),value:pending},100);
+  try{return await pending}catch(error){shapedCache.delete(cacheKey);throw error}
 }
 
 const types = { '.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.json':'application/json','.png':'image/png','.svg':'image/svg+xml' };
 function createServer(){return http.createServer(async (req, res) => {
   try {
-    res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');res.setHeader('X-Frame-Options','DENY');res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://raw.githubusercontent.com; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
+    res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','strict-origin-when-cross-origin');res.setHeader('X-Frame-Options','DENY');res.setHeader('Permissions-Policy','camera=(), microphone=(), geolocation=()');res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https://raw.githubusercontent.com; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'");
     if(req.method!=='GET'&&req.method!=='HEAD')throw Object.assign(new Error('Method not allowed.'),{status:405});
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    if(['/assets/site.css','/assets/site.js'].includes(url.pathname)){const type=url.pathname.endsWith('.js')?'js':'css',bundle=assetBundle(publicRoot,type);res.setHeader('ETag',bundle.etag);res.setHeader('Cache-Control','public, no-cache');res.setHeader('Vary','Accept-Encoding');if(req.headers['if-none-match']===bundle.etag){res.writeHead(304);return res.end()}const gzip=/\bgzip\b/.test(req.headers['accept-encoding']||'');res.setHeader('Content-Type',type==='js'?'text/javascript; charset=utf-8':'text/css; charset=utf-8');if(gzip)res.setHeader('Content-Encoding','gzip');res.writeHead(200);return res.end(req.method==='HEAD'?'':gzip?bundle.gzip:bundle.content);}
     if(url.pathname==='/api/health'){res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});return res.end(JSON.stringify({ok:true,service:'skyfolio'}))}
     if(url.pathname.startsWith('/api/skin/')){const username=decodeURIComponent(url.pathname.slice(10));if(!/^[A-Za-z0-9_]{1,16}$/.test(username))throw Object.assign(new Error('Invalid username.'),{status:400});const skin=await getSkin(username);res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'public, max-age=3600'});return res.end(skin)}
     if(url.pathname.startsWith('/api/avatar/')){const username=decodeURIComponent(url.pathname.slice(12));if(!/^[A-Za-z0-9_]{1,16}$/.test(username))throw Object.assign(new Error('Invalid username.'),{status:400});const avatar=await getAvatar(username);res.writeHead(200,{'Content-Type':'image/png','Cache-Control':'public, max-age=3600'});return res.end(avatar)}
-    if(url.pathname.startsWith('/api/item-texture/')){const id=decodeURIComponent(url.pathname.slice(18));if(!/^[A-Za-z0-9_;:-]{1,80}$/.test(id))throw Object.assign(new Error('Invalid item id.'),{status:400});const image=await getItemTexture(id),contentType=image.length>12&&image.subarray(0,4).toString()==='RIFF'&&image.subarray(8,12).toString()==='WEBP'?'image/webp':'image/png';res.writeHead(200,{'Content-Type':contentType,'Cache-Control':'public, max-age=86400'});return res.end(image)}
+    if(url.pathname.startsWith('/api/item-texture/')){const id=decodeURIComponent(url.pathname.slice(18));if(!/^[A-Za-z0-9_;:-]{1,80}$/.test(id))throw Object.assign(new Error('Invalid item id.'),{status:400});const {image,fallback}=await getItemTexture(id),contentType=fallback?'image/svg+xml':image.length>12&&image.subarray(0,4).toString()==='RIFF'&&image.subarray(8,12).toString()==='WEBP'?'image/webp':'image/png';res.writeHead(200,{'Content-Type':contentType,'Cache-Control':fallback?'no-store':'public, max-age=86400'});return res.end(req.method==='HEAD'?'':image)}
+    if(url.pathname.startsWith('/api/acquisition/')){const id=decodeURIComponent(url.pathname.slice('/api/acquisition/'.length));if(!/^[A-Z0-9_;-]{1,80}$/.test(id))throw Object.assign(Error('Invalid item id'),{status:400});const result=await getAcquisition(id);res.writeHead(200,{'Content-Type':'application/json','Cache-Control':result.wikiStatus==='available'?'public, max-age=3600':'no-cache'});return res.end(req.method==='HEAD'?'':JSON.stringify(result));}
     if(url.pathname.startsWith('/api/minion-recipe/')){const id=decodeURIComponent(url.pathname.slice(19));if(!/^[A-Z0-9_]{3,80}$/.test(id))throw Object.assign(new Error('Invalid recipe id.'),{status:400});const recipe=await getMinionRecipe(id);res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'public, max-age=21600'});return res.end(JSON.stringify(recipe))}
     if (url.pathname.startsWith('/api/profile/')) {
       const username = decodeURIComponent(url.pathname.slice('/api/profile/'.length));
       if (!/^[A-Za-z0-9_]{1,16}$/.test(username)) throw Object.assign(new Error('Enter a valid Minecraft username.'), { status:400 });
-      const body = await getProfile(username, url.searchParams.get('profile'),url.searchParams.get('refresh')==='1');
+      const body = await getProfile(username, url.searchParams.get('profile'),url.searchParams.get('refresh')==='1',url.searchParams.get('view')==='core'?'core':'full');
       res.writeHead(200, {'Content-Type':'application/json','Cache-Control':'private, max-age=60'}); return res.end(req.method==='HEAD'?'':JSON.stringify(body));
     }
     const appRoutes=new Set(['/inventory','/ender-chest','/backpacks','/bags','/sacks','/wardrobe','/equipment','/loadouts','/skills','/slayer','/dungeons','/pets','/mining','/garden','/bestiary','/minions','/collections','/crimson','/rift','/misc','/networth','/notebook','/accessories','/essence','/museum','/mayor','/events','/ironpath','/planner','/progress','/compare','/data']);
@@ -218,4 +263,4 @@ function createServer(){return http.createServer(async (req, res) => {
   }
 });}
 
-module.exports={createServer,buildRecommendations};
+module.exports={createServer,buildRecommendations,shapeProfile};

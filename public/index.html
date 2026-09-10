@@ -10,31 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <style>@font-face{font-family:Minecraft;src:url('https://cdn.jsdelivr.net/npm/skinview3d/assets/minecraft.woff2') format('woff2');font-display:swap}</style>
   <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/styles.css" />
-  <link rel="stylesheet" href="/css/theme.css" />
-  <link rel="stylesheet" href="/css/brand.css" />
-  <link rel="stylesheet" href="/css/modal.css" />
-  <link rel="stylesheet" href="/css/storage.css" />
-  <link rel="stylesheet" href="/css/compact.css" />
-  <link rel="stylesheet" href="/css/modules.css" />
-  <link rel="stylesheet" href="/css/tooltip.css" />
-  <link rel="stylesheet" href="/css/notebook.css" />
-  <link rel="stylesheet" href="/css/freshness.css" />
-  <link rel="stylesheet" href="/css/ironpath.css" />
-  <link rel="stylesheet" href="/css/polish.css" />
-  <link rel="stylesheet" href="/css/optimizations.css?v=2.1.4" />
-  <link rel="stylesheet" href="/css/item-search.css" />
-  <link rel="stylesheet" href="/css/dashboard-v2.css" />
-  <link rel="stylesheet" href="/css/pets.css" />
-  <link rel="stylesheet" href="/css/profile-sections.css" />
-  <link rel="stylesheet" href="/css/profile-depth.css" />
-  <link rel="stylesheet" href="/css/profile-progress.css" />
-  <link rel="stylesheet" href="/css/world-depth.css" />
-  <link rel="stylesheet" href="/css/claimed.css" />
-  <link rel="stylesheet" href="/css/customization.css" />
-  <link rel="stylesheet" href="/css/mobile.css?v=2.1.5" />
-  <link rel="stylesheet" href="/css/progress-tools.css?v=2.2.0" />
-  <link rel="stylesheet" href="/css/module-workspace.css?v=2.4.0" />
+  <link rel="stylesheet" href="/assets/site.css" />
 </head>
 <body>
   <div class="noise"></div>
@@ -59,6 +35,7 @@
       </div>
       <div class="profile-actions"><span class="freshness" id="freshness">Not loaded</span><button class="refresh-btn" id="refreshBtn" title="Refresh API data">↻</button><select id="profileSelect" aria-label="Profile" disabled><option>Select profile</option></select><button class="share" id="shareBtn">↗ &nbsp; Share</button></div>
     </section>
+    <div id="dataAvailability" class="data-availability" role="status" aria-live="polite"></div>
     <section class="module-library" aria-label="Profile modules">
       <div id="moduleEssentials" class="module-essentials">
         <section class="essential-accessories"><button class="essential-title" data-module="accessories"><span aria-hidden="true">&#9670;</span> Accessories <b id="accessoryQuickPower">&#8212; MP</b></button><div class="essential-shortcuts"><button data-module="accessories" data-accessory-view="calculator">MP Calculator</button><button data-module="accessories" data-accessory-view="missing">Missing Accessories <span aria-hidden="true">&#8599;</span></button></div></section>
@@ -113,17 +90,8 @@
       <div class="modal-content" id="wardrobeContent"></div>
     </section>
   </div>
-  <div class="modal" id="moduleModal" aria-hidden="true"><div class="modal-backdrop" data-close-module></div><section class="modal-panel module-workspace" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="moduleTitle" aria-describedby="moduleDescription"><aside class="module-sidebar"><a class="module-home" href="/" data-close-module>Back to profile</a><div class="eyebrow">YOUR TOOLKIT</div><nav id="moduleSidebar" aria-label="Switch module"></nav></aside><div class="module-main"><header class="module-workspace-header"><div><div class="eyebrow" id="moduleCategory">PROFILE MODULE</div><h2 id="moduleTitle">Profile</h2><p id="moduleDescription"></p></div><button class="modal-close" data-close-module aria-label="Close module">&times;</button></header><div class="modal-content" id="moduleContent"></div></div></section></div>
+  <div class="modal" id="moduleModal" aria-hidden="true"><div class="modal-backdrop" data-close-module></div><section class="modal-panel module-workspace" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="moduleTitle" aria-describedby="moduleDescription"><aside class="module-sidebar"><a class="module-home" href="/" data-close-module>Back to profile</a><div class="eyebrow">YOUR TOOLKIT</div><nav id="moduleSidebar" aria-label="Switch module"></nav></aside><div class="module-main"><header class="module-workspace-header"><div><div class="eyebrow" id="moduleCategory">PROFILE MODULE</div><h2 id="moduleTitle">Profile</h2><p id="moduleDescription"></p></div><button class="modal-close" data-close-module aria-label="Close module">&times;</button></header><div id="moduleAvailability" class="module-availability" role="status"></div><div class="modal-content" id="moduleContent"></div></div></section></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="https://cdn.jsdelivr.net/npm/skinview3d@3.4.1/bundles/skinview3d.bundle.js"></script>
-  <script src="/js/app.js?v=2.4.0"></script>
-  <script src="/js/events-calendar.js"></script>
-  <script src="/js/profile-depth.js"></script>
-  <script src="/js/profile-progress.js?v=2.4.0"></script>
-  <script src="/js/world-depth.js"></script>
-  <script src="/js/progress-tools.js?v=2.2.0"></script>
-  <script src="/js/module-workspace.js?v=2.4.0"></script>
-  <script src="/js/customization.js?v=2.4.0"></script>
-  <script src="/js/mobile.js?v=2.1.5"></script>
+  <script src="/assets/site.js"></script>
 </body>
 </html>
