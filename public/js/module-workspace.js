@@ -104,6 +104,12 @@ const moduleGroups=[
         "Misc",
         "Bestiary and additional profile stats",
         "◇"
+      ],
+      [
+        "magicfind",
+        "Magic Find",
+        "Calculate drop odds and find missing upgrades",
+        "✯"
       ]
     ]
   },
