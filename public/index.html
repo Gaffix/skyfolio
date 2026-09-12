@@ -33,16 +33,10 @@
         <div class="mini-avatar"><canvas id="avatarCanvas" width="72" height="72" style="width:100%;height:100%;image-rendering:pixelated" aria-label="Player avatar"></canvas></div>
         <div><div class="eyebrow">SKYBLOCK PROFILE</div><div class="player-name-row"><h1 id="playerName">Search a player</h1><span id="ironmanBadge" class="ironman-badge" role="img" aria-label="Ironman profile" title="Ironman" hidden>&#9851;</span></div><div class="meta" id="profileMeta"><span class="status-dot"></span> Ready for live data</div></div>
       </div>
-      <div class="profile-actions"><span class="freshness" id="freshness">Not loaded</span><button class="refresh-btn" id="refreshBtn" title="Refresh API data">↻</button><select id="profileSelect" aria-label="Profile" disabled><option>Select profile</option></select><button class="share" id="shareBtn">↗ &nbsp; Share</button></div>
+      <div class="profile-actions"><button class="notebook-open" id="notebookOpen" type="button">▤ Notebook</button><span class="freshness" id="freshness">Not loaded</span><button class="refresh-btn" id="refreshBtn" title="Refresh API data">↻</button><select id="profileSelect" aria-label="Profile" disabled><option>Select profile</option></select><button class="share" id="shareBtn">↗ &nbsp; Share</button></div>
     </section>
     <div id="dataAvailability" class="data-availability" role="status" aria-live="polite"></div>
-    <section class="module-library" aria-label="Profile modules">
-      <div id="moduleEssentials" class="module-essentials">
-        <section class="essential-accessories"><button class="essential-title" data-module="accessories"><span aria-hidden="true">&#9670;</span> Accessories <b id="accessoryQuickPower">&#8212; MP</b></button><div class="essential-shortcuts"><button data-module="accessories" data-accessory-view="calculator">MP Calculator</button><button data-module="accessories" data-accessory-view="missing">Missing Accessories <span aria-hidden="true">&#8599;</span></button></div></section>
-        <button class="essential-forge" data-module="ironpath"><span class="forge-mark" aria-hidden="true">&#9935;</span><strong>IronPath</strong><span class="forge-quick-state" id="forgeQuickState">Forge planner</span><span aria-hidden="true">&#8599;</span></button>
-      </div>
-      <nav class="module-nav" id="moduleNav" aria-label="Profile modules"></nav>
-    </section>
+    <section class="module-library" aria-label="Profile modules"><nav class="module-nav" id="moduleNav" aria-label="Profile modules"></nav></section>
 
     <section class="dashboard-grid">
       <aside class="left-col">
@@ -54,6 +48,7 @@
         </article>
         <article class="card purse"><div><small>PURSE</small><strong id="purse">—</strong></div><div><small>BANK</small><strong id="bank">—</strong></div></article>
         <article class="card activity"><div class="card-title"><span>RECENT ACTIVITY</span><a>LIVE PROFILE DATA</a></div><div id="activityList"></div></article>
+        <div id="moduleEssentials" class="module-essentials"><section class="essential-accessories"><button class="essential-title" data-module="accessories"><span aria-hidden="true">&#9670;</span> Accessories <b id="accessoryQuickPower">&#8212; MP</b></button><div class="essential-shortcuts"><button data-module="accessories" data-accessory-view="calculator">MP Calculator</button><button data-module="accessories" data-accessory-view="missing">Missing Accessories <span aria-hidden="true">&#8599;</span></button></div></section><button class="essential-forge" data-module="ironpath"><span class="forge-mark" aria-hidden="true">&#9935;</span><strong>IronPath</strong><span class="forge-quick-state" id="forgeQuickState">Forge planner</span><span aria-hidden="true">&#8599;</span></button></div>
       </aside>
 
       <section class="center-col">
@@ -78,7 +73,7 @@
         <article class="card skills"><div class="card-title"><span>TOP SKILLS</span><a href="/skills">All skills</a></div><div id="skillsList"></div></article>
         <article class="card collection"><div class="card-title"><span>COLLECTION PROGRESS</span><b id="collectionPercent">—</b></div><div class="collection-bar"><span id="collectionBar" style="width:0"></span></div><small id="collectionSummary">Search to load collection progress</small></article>
         <nav id="moduleSecondary" class="secondary-modules" aria-label="Planning and world tools"></nav>
-        <div class="profile-utility-actions" aria-label="Profile settings"><button class="notebook-open" id="notebookOpen" type="button">▤ Notebook</button><button class="profile-info-open" id="profileInfoOpen" type="button">◇ Profile</button><button class="widgets-open" id="widgetsOpen" type="button">▦ Widgets</button><button class="customize-open" id="customizeOpen" type="button">✦ Customize</button></div>
+        <div class="profile-utility-actions" aria-label="Profile settings"><button class="profile-info-open" id="profileInfoOpen" type="button">◇ Profile</button><button class="widgets-open" id="widgetsOpen" type="button">▦ Widgets</button><button class="customize-open" id="customizeOpen" type="button">✦ Customize</button></div>
       </aside>
     </section>
   </main>
