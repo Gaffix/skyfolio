@@ -151,7 +151,8 @@ function shapeProfile(profile, uuid, username, count, collectionResources, besti
   const slayerXp = Object.values(slayers || {}).reduce((sum, boss) => sum + Number(boss?.xp || 0), 0);
   const cataXp = Number(first(member, ['dungeons.dungeon_types.catacombs.experience','dungeons.dungeon_types.CATACOMBS.experience']));
   const levelXp = Number(first(member, ['leveling.experience','player_data.leveling.experience']));
-  const equipment=readEquipment(member),loadouts=readLoadouts(member),storage=readStorage(member),pets=petStats(member);
+  const equipment=readEquipment(member),loadouts=readLoadouts(member),storage=readStorage(member),pets=petStats(member),accessories=accessoryStats(member,storage,accessoryParents);
+  accessories.missingAccessories=(accessories.missingAccessories||[]).filter(item=>!String(item.id||'').toUpperCase().startsWith('RIFT_')&&item.rift_transferrable!==false);
   return {
     id: profile.profile_id,
     cuteName: profile.cute_name || 'Unnamed', selected: Boolean(profile.selected), username, uuid,
@@ -161,7 +162,7 @@ function shapeProfile(profile, uuid, username, count, collectionResources, besti
     skyblockLevel: levelXp / 100,
     skillAverage: availableSkills.length ? availableSkills.reduce((a,b)=>a+b,0) / availableSkills.length : 0,
     catacombs: levelFromXp(cataXp, dungeonXp), slayerXp, skills, equipment, loadouts, storage, collections: collectionProgress(member,collectionResources), activity: recentActivity(member),
-    identity:profileIdentity(profile,member,playerData,identityData),slayers:slayerStats(member),dungeonDetails:dungeonStats(member),skillDetails:detailedSkills(member,garden,equipment,loadouts),pets,petScore:petScore(pets),mining:miningStats(member),garden:gardenStats(member,garden),minions:minionStats(profile),crimson:crimsonStats(member),rift:riftStats(member),misc:miscStats(member),miscDeep:miscDeepStats(profile,member,playerData),bestiary:bestiaryStats(member,bestiaryResources),networth:networthStats(profile,member,storage,loadouts,bazaar,lowestBin,pets),accessories:accessoryStats(member,storage,accessoryParents),essence:essenceStats(member),museum:museumStats(museum,uuid),mayor:election,ironpath:ironpathStats(member,storage,loadouts,equipment)
+    identity:profileIdentity(profile,member,playerData,identityData),slayers:slayerStats(member),dungeonDetails:dungeonStats(member),skillDetails:detailedSkills(member,garden,equipment,loadouts),pets,petScore:petScore(pets),mining:miningStats(member),garden:gardenStats(member,garden),minions:minionStats(profile),crimson:crimsonStats(member),rift:riftStats(member),misc:miscStats(member),miscDeep:miscDeepStats(profile,member,playerData),bestiary:bestiaryStats(member,bestiaryResources),networth:networthStats(profile,member,storage,loadouts,bazaar,lowestBin,pets),accessories,essence:essenceStats(member),museum:museumStats(museum,uuid),mayor:election,ironpath:ironpathStats(member,storage,loadouts,equipment)
   };
 }
 
